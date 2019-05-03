@@ -34,3 +34,6 @@ class FilterLayer;
 class FillLayer;
 class FileLayer;
 class VectorLayer;
+
+class Assistant;
+class AssistantHandle;

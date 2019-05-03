@@ -19,11 +19,15 @@
 #include <KoCanvasBase.h>
 #include <kis_canvas2.h>
 #include <KisView.h>
+#include <KisViewManager.h>
 #include <KoCanvasController.h>
 #include <kis_canvas_controller.h>
 #include <kis_zoom_manager.h>
 #include <QPointer>
 #include <View.h>
+#include <kis_pointer_utils.h>
+#include <kis_abstract_perspective_grid.h>
+#include <kis_canvas_resource_provider.h>
 
 struct Canvas::Private {
     Private() {}
@@ -139,4 +143,58 @@ void Canvas::setLevelOfDetailMode(bool enable)
 {
     if (!d->canvas) return;
     return d->canvas->imageView()->canvasController()->slotToggleLevelOfDetailMode(enable);
+}
+
+Assistant* Canvas::selectedAssistant()
+{
+  ENTER_FUNCTION();
+  if (!d->canvas) return 0;
+  return new Assistant(d->canvas->paintingAssistantsDecoration()->selectedAssistant());
+}
+
+Assistant* Canvas::addAssistant(QString id)
+{
+  KisPaintingAssistantSP assis;
+  KisPaintingAssistantFactory* factory = KisPaintingAssistantFactoryRegistry::instance()->get(id);
+
+  if (factory)
+    {
+      assis = toQShared(factory->createPaintingAssistant());
+
+      for (int i = 0 ; i < assis->numHandles() ; i++)
+	{
+	  assis->addHandle(new KisPaintingAssistantHandle (0.0, 0.0), HandleType::NORMAL);
+	}
+
+      if (assis->id() == "vanishing point")
+	{
+	  for (int i = 0 ; i < 4 ; i++)
+	    {
+	      assis->addHandle(new KisPaintingAssistantHandle (0.0, 0.0), HandleType::SIDE);
+	    }
+	}
+
+      d->canvas->paintingAssistantsDecoration()->addAssistant(assis);
+      return new Assistant(assis);
+    }
+
+  return 0;
+}
+
+void Canvas::removeAssistant(Assistant* assis)
+{
+  KisPaintingAssistantSP kis_assis = assis->assistant();
+  if (kis_assis) {
+    KisAbstractPerspectiveGrid* grid = dynamic_cast<KisAbstractPerspectiveGrid*>(kis_assis.data());
+    if (grid) {
+      d->canvas->viewManager()->canvasResourceProvider()->removePerspectiveGrid(grid);
+    }
+    d->canvas->paintingAssistantsDecoration()->removeAssistant(kis_assis);
+  }
+}
+
+void Canvas::update()
+{
+  if (!d->canvas) return;
+  d->canvas->canvasWidget()->update();
 }

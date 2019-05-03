@@ -992,3 +992,13 @@ void Document::setCurrentTime(int time)
 
     return d->document->image()->animationInterface()->requestTimeSwitchWithUndo(time);
 }
+
+QList<Assistant*> Document::assistants()
+{
+  QList<KisPaintingAssistantSP> assistants_sp = d->document->assistants();
+  QList<Assistant*> assistants = {};
+  Q_FOREACH(KisPaintingAssistantSP assis, assistants_sp){
+    assistants.append(new Assistant(assis));
+  }
+  return assistants;
+}

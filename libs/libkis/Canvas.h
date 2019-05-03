@@ -20,6 +20,8 @@
 
 #include <QObject>
 
+#include "Assistant.h"
+
 #include "kritalibkis_export.h"
 #include "libkis.h"
 
@@ -105,6 +107,12 @@ public Q_SLOTS:
      * @brief setLevelOfDetailMode sets Instant Preview to @param enable
      */
     void setLevelOfDetailMode(bool enable);
+
+    Assistant *selectedAssistant();
+    Assistant *addAssistant(QString id);
+    void removeAssistant(Assistant* assis);
+
+    void update();
 
     /**
      * @return the view that holds this canvas

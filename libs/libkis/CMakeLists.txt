@@ -27,6 +27,8 @@ set(kritalibkis_LIB_SRCS
     VectorLayer.cpp
     FilterMask.cpp
     SelectionMask.cpp
+    Assistant.cpp
+    AssistantHandle.cpp
 
     Shape.cpp
     GroupShape.cpp

@@ -46,5 +46,7 @@
 %Include PaletteView.sip
 %Include ManagedColor.sip
 %Include Swatch.sip
+%Include Assistant.sip
+%Include AssistantHandle.sip
 
 %Include KisCubicCurve.sip

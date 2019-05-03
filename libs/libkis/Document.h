@@ -31,6 +31,7 @@
 #include "VectorLayer.h"
 #include "FilterMask.h"
 #include "SelectionMask.h"
+#include "Assistant.h"
 
 class KisDocument;
 
@@ -847,6 +848,8 @@ print(root.childNodes())
      * @brief set current time of document's animation
      */
     void setCurrentTime(int time);
+
+    QList<Assistant*> assistants();
 
 
 private:

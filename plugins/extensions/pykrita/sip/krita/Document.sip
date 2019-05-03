@@ -98,6 +98,7 @@ public Q_SLOTS:
     int playBackEndTime();
     int currentTime();
     void setCurrentTime(int time);
+    QList<Assistant*> assistants();
 
 private:
 

@@ -21,6 +21,9 @@ public Q_SLOTS:
     void setLevelOfDetailMode(bool enable);
     bool levelOfDetailMode() const;
     View *view() const /Factory/;
+    Assistant *selectedAssistant();
+    Assistant *addAssistant(QString id) /Factory/;
+    void update();
 Q_SIGNALS:
 private:
 };
