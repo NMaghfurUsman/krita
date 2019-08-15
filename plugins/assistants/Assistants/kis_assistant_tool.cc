@@ -53,6 +53,8 @@
 #include <kis_undo_adapter.h>
 
 #include <math.h>
+#include <limits>
+#include <QtCore/qmath.h>
 
 KisAssistantTool::KisAssistantTool(KoCanvasBase * canvas)
     : KisTool(canvas, KisCursor::arrowCursor()), m_canvas(dynamic_cast<KisCanvas2*>(canvas)),
@@ -403,6 +405,7 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
                 }
             }
         }
+	UIPullCoords();
         m_canvas->updateCanvas();
     } else if (m_assistantDrag) {
         QPointF newAdjustment = canvasDecoration->snapToGuide(event, QPointF(), false) - m_cursorStart;
@@ -419,6 +422,7 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
         }
         m_currentAdjustment = newAdjustment;
         m_canvas->updateCanvas();
+	UIPullCoords();
 
     } else {
         event->ignore();
@@ -504,6 +508,7 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
         }
     }
     if (wasHiglightedNode && !m_higlightedNode) {
+	UIPullCoords();
         m_canvas->updateCanvas(); // TODO update only the relevant part of the canvas
     }
 }
@@ -535,6 +540,7 @@ void KisAssistantTool::endPrimaryAction(KoPointerEvent *event)
         event->ignore();
     }
 
+    UIPullCoords();
     m_canvas->updateCanvas(); // TODO update only the relevant part of the canvas
 }
 
@@ -584,11 +590,28 @@ void KisAssistantTool::assistantSelected(KisPaintingAssistantSP assistant)
 
 void KisAssistantTool::updateToolOptionsUI()
 {
+  m_handles = m_canvas->paintingAssistantsDecoration()->handles(); // can be modifed removed from python
+
      KisPaintingAssistantSP m_selectedAssistant =  m_canvas->paintingAssistantsDecoration()->selectedAssistant();
 
      bool hasActiveAssistant = m_selectedAssistant ? true : false;
 
      if (m_selectedAssistant) {
+         m_options.coordsWidget->setVisible(true);
+         m_options.coordsLabel->setText(m_selectedAssistant->name());
+  
+         const int numHandles = m_selectedAssistant->numHandles();
+  
+         // show as many coord widgets as needed for the selected assistant's handles ...
+         for (int l=1;l<=numHandles;l++){
+	   m_options.coordsWidget->layout()->itemAt(l)->widget()->setVisible(true);
+         }
+
+	 // ... and hide the rest
+         for (int l=4;l>numHandles;l--){
+	   m_options.coordsWidget->layout()->itemAt(l)->widget()->setVisible(false);
+         }
+
          bool isVanishingPointAssistant = m_selectedAssistant->id() == "vanishing point";
          m_options.vanishingPointAngleSpinbox->setVisible(isVanishingPointAssistant);
 
@@ -602,8 +625,11 @@ void KisAssistantTool::updateToolOptionsUI()
          m_options.customAssistantColorButton->setColor(m_selectedAssistant->assistantCustomColor());
          float opacity = (float)m_selectedAssistant->assistantCustomColor().alpha()/255.0 * 100.0 ;
          m_options.customColorOpacitySlider->setValue(opacity);
+
+	 UIPullCoords();
      } else {
          m_options.vanishingPointAngleSpinbox->setVisible(false); //
+	 m_options.coordsWidget->setVisible(false);
      }
 
      // show/hide elements if an assistant is selected or not
@@ -993,6 +1019,18 @@ QWidget *KisAssistantTool::createOptionWidget()
 
         m_options.vanishingPointAngleSpinbox->setVisible(false);
 
+	// initalize coordsWidget
+	m_options.coordsLayout->setAlignment(m_options.coordsLabel, Qt::AlignHCenter);
+	QList<KisDoubleParseSpinBox*> all_coord_spinboxes = m_options.coordsWidget->findChildren<KisDoubleParseSpinBox*>();
+	Q_FOREACH (KisDoubleParseSpinBox* spinbox, all_coord_spinboxes) {
+	  spinbox->setSuffix(" px");
+	  spinbox->setMaximum(std::numeric_limits<double>::max());
+	  spinbox->setMinimum(-1*std::numeric_limits<double>::max());
+	  spinbox->setMinimumSize(48,18);
+	  spinbox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+	  connect(spinbox,SIGNAL(valueChanged(double)),this,SLOT(slotUIPushCoords()));
+	}
     }
 
     updateToolOptionsUI();
@@ -1058,4 +1096,61 @@ void KisAssistantTool::slotCustomOpacityChanged()
     // this forces the canvas to refresh to see the changes immediately
     m_canvas->paintingAssistantsDecoration()->uncache();
     m_canvas->canvasWidget()->update();
+}
+
+void KisAssistantTool::UIPullCoords() {
+  KisPaintingAssistantSP m_selectedAssistant =  m_canvas->paintingAssistantsDecoration()->selectedAssistant();
+
+  if (m_selectedAssistant) {
+    const int numHandles = m_selectedAssistant->numHandles();
+
+    // collect as many layouts as needed for the selected Assistant
+    QList<QLayout*> layouts = {};
+    for (int l=1;l<=numHandles;l++){
+      layouts.append(m_options.coordsWidget->layout()->itemAt(l)->widget()->layout());
+    }
+
+    for (int i = 0; i<numHandles;i++){
+
+      KisDoubleParseSpinBox* x = static_cast<KisDoubleParseSpinBox*>(layouts[i]->itemAt(0)->widget());
+      KisDoubleParseSpinBox* y = static_cast<KisDoubleParseSpinBox*>(layouts[i]->itemAt(1)->widget());
+
+      x->blockSignals(true);
+      x->setValue(m_selectedAssistant->handles()[i]->x());
+      x->blockSignals(false);
+
+      y->blockSignals(true);
+      y->setValue(m_selectedAssistant->handles()[i]->y());
+      y->blockSignals(false);
+    }
+  }
+}
+
+void KisAssistantTool::slotUIPushCoords() {
+  // NB: This slot pushes the value of ALL coord spinboxes when any ONE of them emits a valueChanged signal
+
+  KisPaintingAssistantSP m_selectedAssistant =  m_canvas->paintingAssistantsDecoration()->selectedAssistant();
+
+  if (m_selectedAssistant) {
+    const int numHandles = m_selectedAssistant->numHandles();
+      // m_selectedAssistant->pullCoords(m_options.coordsWidget);
+
+      QList<QLayout*> layouts = {};
+
+      for (int l=1;l<=numHandles;l++){
+	layouts.append(m_options.coordsWidget->layout()->itemAt(l)->widget()->layout());
+      }
+
+      for (int i = 0; i<numHandles;i++){
+
+	KisDoubleParseSpinBox* x = static_cast<KisDoubleParseSpinBox*>(layouts[i]->itemAt(0)->widget());
+	KisDoubleParseSpinBox* y = static_cast<KisDoubleParseSpinBox*>(layouts[i]->itemAt(1)->widget());
+
+	m_selectedAssistant->handles()[i]->setX(x->value());
+	m_selectedAssistant->handles()[i]->setY(y->value());
+    }
+  }
+
+  m_canvas->paintingAssistantsDecoration()->uncache();
+  m_canvas->canvasWidget()->update();
 }

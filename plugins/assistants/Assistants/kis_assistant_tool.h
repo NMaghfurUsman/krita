@@ -106,6 +106,10 @@ private Q_SLOTS:
     void slotUpdateCustomColor();
     void slotCustomOpacityChanged();
 
+    // update display of m_selectedAssistant's handle coords in tool options
+    void UIPullCoords(); // pull coords from canvas to widget
+    void slotUIPushCoords(); // push coords from widget to canvas
+
 protected:
     /// Draws the editor widget controls with move, activate, and delete
     /// This also creates a lot of assistant specific stuff for vanishing points and perspective grids

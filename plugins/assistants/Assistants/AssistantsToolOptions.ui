@@ -233,6 +233,61 @@
      </item>
     </layout>
    </item>
+
+
+   <item>
+     <widget class="QWidget" name="coordsWidget">
+       <layout class="QVBoxLayout" name="coordsLayout">
+	 <property name="spacing"><number>10</number></property>
+
+	 <item>
+	   <widget class="QLabel" name="coordsLabel"> </widget>
+	 </item>
+
+	 <item>
+	   <widget class="QWidget">
+	   <layout class="QVBoxLayout">
+	     <property name="spacing"><number>0</number></property>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>x: </string></property> </widget></item>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>y: </string></property> </widget></item>
+	   </layout>
+	   </widget>
+	 </item>
+
+	 <item>
+	   <widget class="QWidget">
+	   <layout class="QVBoxLayout">
+	     <property name="spacing"><number>0</number></property>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>x: </string></property> </widget> </item>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>y: </string></property> </widget></item>
+	   </layout>
+	   </widget>
+	 </item>
+
+	 <item>
+	   <widget class="QWidget">
+	   <layout class="QVBoxLayout">
+	     <property name="spacing"><number>0</number></property>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>x: </string></property> </widget> </item>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>y: </string></property> </widget></item>
+	   </layout>
+	   </widget>
+	 </item>
+
+	 <item>
+	   <widget class="QWidget">
+	   <layout class="QVBoxLayout">
+	     <property name="spacing"><number>0</number></property>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>x: </string></property> </widget> </item>
+	     <item><widget class="KisDoubleParseSpinBox"><property name="prefix"><string>y: </string></property> </widget></item>
+	   </layout>
+	   </widget>
+	 </item>
+
+       </layout>
+     </widget>
+   </item>
+
   </layout>
  </widget>
  <customwidgets>
@@ -252,6 +307,12 @@
    <class>KColorButton</class>
    <extends>QPushButton</extends>
    <header>kcolorbutton.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>KisDoubleParseSpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header>kis_double_parse_spin_box.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
