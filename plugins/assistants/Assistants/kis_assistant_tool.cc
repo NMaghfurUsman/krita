@@ -656,7 +656,7 @@ void KisAssistantTool::mouseMoveEvent(KoPointerEvent *event)
     if (m_newAssistant && m_internalMode == MODE_CREATION) {
 
         KisPaintingAssistantHandleSP new_handle = m_newAssistant->handles().back();
-        if (snapHandle(event, m_newAssistant, new_handle) == false) {
+        if (!snapHandle(event, m_newAssistant, new_handle)) {
             *new_handle = event->point;
         }
 
