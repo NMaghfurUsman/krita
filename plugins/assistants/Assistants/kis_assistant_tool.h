@@ -68,10 +68,12 @@ public:
      * hitbox regions specified to know if a click is doing any of those actions.
      */
     void beginPrimaryAction(KoPointerEvent *event) override;
-
+    void beginAlternateAction(KoPointerEvent *event, AlternateAction action) override;
 
     void continuePrimaryAction(KoPointerEvent *event) override;
     void endPrimaryAction(KoPointerEvent *event) override;
+    void continueAlternateAction(KoPointerEvent *event, AlternateAction action) override;
+    void endAlternateAction(KoPointerEvent *event, AlternateAction action) override;
     void mouseMoveEvent(KoPointerEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
@@ -85,6 +87,10 @@ private:
     void removeAssistant(KisPaintingAssistantSP assistant);
 
     void assistantSelected(KisPaintingAssistantSP assistant);
+
+    // for shift+mouse-drag or shift+mouse-move snapping
+    // true if given handle has been snapped
+    bool snapHandle(KoPointerEvent *event, KisPaintingAssistantSP assistant, KisPaintingAssistantHandleSP handle);
 
 public Q_SLOTS:
     void activate(ToolActivation toolActivation, const QSet<KoShape*> &shapes) override;

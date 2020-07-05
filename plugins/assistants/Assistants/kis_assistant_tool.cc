@@ -376,15 +376,10 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
 
     if (m_handleDrag) {
         *m_handleDrag = event->point;
-        //ported from the gradient tool... we need to think about this more in the future.
-        if (event->modifiers() == Qt::ShiftModifier && m_snapIsRadial) {
-            QLineF dragRadius = QLineF(m_dragStart, event->point);
-            dragRadius.setLength(m_radius.length());
-            *m_handleDrag = dragRadius.p2();
-        } else if (event->modifiers() == Qt::ShiftModifier ) {
-            QPointF move = snapToClosestAxis(event->point - m_dragStart);
-            *m_handleDrag = m_dragStart + move;
-        } else {
+
+        KisPaintingAssistantSP selectedAssistant = m_canvas->paintingAssistantsDecoration()->selectedAssistant();
+
+        if (!snapHandle(event, selectedAssistant, m_handleDrag)) {
             *m_handleDrag = canvasDecoration->snapToGuide(event, QPointF(), false);
         }
         m_handleDrag->uncache();
@@ -408,7 +403,7 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
         m_canvas->updateCanvas();
     } else if (m_assistantDrag) {
         QPointF newAdjustment = canvasDecoration->snapToGuide(event, QPointF(), false) - m_cursorStart;
-        if (event->modifiers() == Qt::ShiftModifier ) {
+        if (event->modifiers() & Qt::ShiftModifier ) {
             newAdjustment = snapToClosestAxis(newAdjustment);
         }
         Q_FOREACH (KisPaintingAssistantHandleSP handle, m_assistantDrag->handles()) {
@@ -658,7 +653,11 @@ void KisAssistantTool::slotChangeVanishingPointAngle(double value)
 void KisAssistantTool::mouseMoveEvent(KoPointerEvent *event)
 {
     if (m_newAssistant && m_internalMode == MODE_CREATION) {
-        *m_newAssistant->handles().back() = event->point;
+
+        KisPaintingAssistantHandleSP new_handle = m_newAssistant->handles().back();
+        if (snapHandle(event, m_newAssistant, new_handle) == false) {
+            *new_handle = event->point;
+        }
 
     } else if (m_newAssistant && m_internalMode == MODE_DRAGGING_TRANSLATING_TWONODES) {
         QPointF translate = event->point - m_dragEnd;
@@ -1134,4 +1133,94 @@ void KisAssistantTool::slotCustomOpacityChanged()
     // this forces the canvas to refresh to see the changes immediately
     m_canvas->paintingAssistantsDecoration()->uncache();
     m_canvas->canvasWidget()->update();
+}
+
+void KisAssistantTool::beginAlternateAction(KoPointerEvent *event, AlternateAction action)
+{
+    Q_UNUSED(action);
+    setMode(KisTool::PAINT_MODE);
+
+    if (m_newAssistant && m_internalMode == MODE_CREATION) {
+        KisPaintingAssistantsDecorationSP canvasDecoration = m_canvas->paintingAssistantsDecoration();
+
+        *m_newAssistant->handles().back() = event->point;
+
+        if (!snapHandle(event, m_newAssistant, m_newAssistant->handles().back())) {
+            *m_newAssistant->handles().back() = canvasDecoration->snapToGuide(event, QPointF(), false);
+        }
+
+        if (m_newAssistant->handles().size() == m_newAssistant->numHandles()) {
+            addAssistant();
+        } else {
+            m_newAssistant->addHandle(new KisPaintingAssistantHandle(canvasDecoration->snapToGuide(event, QPointF(), false)), HandleType::NORMAL);
+        }
+        m_canvas->updateCanvas();
+        return;
+    }
+}
+
+void KisAssistantTool::continueAlternateAction(KoPointerEvent *event, AlternateAction action)
+{
+    Q_UNUSED(action);
+    event->ignore();
+}
+
+void KisAssistantTool::endAlternateAction(KoPointerEvent *event, AlternateAction action)
+{
+    Q_UNUSED(action);
+    setMode(KisTool::HOVER_MODE);
+    event->ignore();
+    m_canvas->updateCanvas();
+}
+
+bool KisAssistantTool::snapHandle(KoPointerEvent *event, KisPaintingAssistantSP assistant, KisPaintingAssistantHandleSP handle)
+{
+    if ((event->modifiers() & Qt::ShiftModifier) == false) {
+        return false;
+    } else {
+
+        QList<KisPaintingAssistantHandleSP> handles = assistant->handles();
+        if (m_handleDrag) {
+            if (m_snapIsRadial == true) {
+                QLineF dragRadius = QLineF(m_dragStart, event->point);
+                dragRadius.setLength(m_radius.length());
+                *handle = dragRadius.p2();
+            } else {
+                QPointF snap_point = snapToClosestAxis(event->point - m_dragStart);
+                *handle = m_dragStart + snap_point;
+            }
+
+        } else {
+            if (m_newAssistant && m_internalMode == MODE_CREATION) {
+                // for any assistant, snap 2nd handle to x or y axis relative to first handle
+                if (handles.size() == 2) {
+                    QPointF snap_point = snapToClosestAxis(event->point - *handles[0]);
+                    *handle =  *handles[0] + snap_point;
+                } else {
+                    bool was_snapped = false;
+                    if (assistant->id() == "spline") {
+                        KisPaintingAssistantHandleSP start;
+                        handles.size() == 3 ? start = handles[0] : start = handles[1];
+                        QPointF snap_point = snapToClosestAxis(event->point - *start);
+                        *handle =  *start + snap_point;
+                        was_snapped = true;
+                    }
+
+                    if (assistant->id() == "ellipse" ||
+                        assistant->id() == "concentric ellipse" ||
+                        assistant->id() == "fisheye-point") {
+                        QPointF center = QLineF(*handles[0], *handles[1]).center();
+                        QLineF radius = QLineF(center,*handles[0]);
+                        QLineF dragRadius = QLineF(center, event->point);
+                        dragRadius.setLength(radius.length());
+                        *handle = dragRadius.p2();
+                        was_snapped = true;
+                    }
+
+                    return was_snapped;
+                }
+            }
+        }
+        return true;
+    }
 }
