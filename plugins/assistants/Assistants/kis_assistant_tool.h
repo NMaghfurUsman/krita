@@ -88,9 +88,10 @@ private:
 
     void assistantSelected(KisPaintingAssistantSP assistant);
 
-    // for shift+mouse-drag or shift+mouse-move snapping
-    // true if given handle has been snapped
-    bool snapHandle(KoPointerEvent *event, KisPaintingAssistantSP assistant, KisPaintingAssistantHandleSP handle);
+    // Handles both shift+mouse-drag or shift+mouse-move snapping
+    // Returns true if snapping is successful
+    // This uses m_handleDrag or m_newAssistant to figure out what handle to snap and where
+    bool snap(KoPointerEvent *event);
 
 public Q_SLOTS:
     void activate(ToolActivation toolActivation, const QSet<KoShape*> &shapes) override;

@@ -380,7 +380,7 @@ void KisAssistantTool::continuePrimaryAction(KoPointerEvent *event)
 
         KisPaintingAssistantSP selectedAssistant = m_canvas->paintingAssistantsDecoration()->selectedAssistant();
 
-        if (!snapHandle(event, selectedAssistant, m_handleDrag)) {
+        if (!snap(event)) {
             *m_handleDrag = canvasDecoration->snapToGuide(event, QPointF(), false);
         }
         m_handleDrag->uncache();
@@ -656,7 +656,7 @@ void KisAssistantTool::mouseMoveEvent(KoPointerEvent *event)
     if (m_newAssistant && m_internalMode == MODE_CREATION) {
 
         KisPaintingAssistantHandleSP new_handle = m_newAssistant->handles().back();
-        if (!snapHandle(event, m_newAssistant, new_handle)) {
+        if (!snap(event)) {
             *new_handle = event->point;
         }
 
@@ -1146,7 +1146,7 @@ void KisAssistantTool::beginAlternateAction(KoPointerEvent *event, AlternateActi
 
         *m_newAssistant->handles().back() = event->point;
 
-        if (!snapHandle(event, m_newAssistant, m_newAssistant->handles().back())) {
+        if (!snap(event)) {
             *m_newAssistant->handles().back() = canvasDecoration->snapToGuide(event, QPointF(), false);
         }
 
@@ -1174,56 +1174,57 @@ void KisAssistantTool::endAlternateAction(KoPointerEvent *event, AlternateAction
     m_canvas->updateCanvas();
 }
 
-bool KisAssistantTool::snapHandle(KoPointerEvent *event, KisPaintingAssistantSP assistant, KisPaintingAssistantHandleSP handle)
+bool KisAssistantTool::snap(KoPointerEvent *event)
 {
     if ((event->modifiers() & Qt::ShiftModifier) == false) {
         return false;
     } else {
 
-        QList<KisPaintingAssistantHandleSP> handles = assistant->handles();
         if (m_handleDrag) {
             if (m_snapIsRadial == true) {
                 QLineF dragRadius = QLineF(m_dragStart, event->point);
                 dragRadius.setLength(m_radius.length());
-                *handle = dragRadius.p2();
+                *m_handleDrag = dragRadius.p2();
             } else {
                 QPointF snap_point = snapToClosestAxis(event->point - m_dragStart);
-                *handle = m_dragStart + snap_point;
+                *m_handleDrag = m_dragStart + snap_point;
             }
 
         } else {
             if (m_newAssistant && m_internalMode == MODE_CREATION) {
+                QList<KisPaintingAssistantHandleSP> handles = m_newAssistant->handles();
+                KisPaintingAssistantHandleSP handle_snap = handles.back();
                 // for any assistant, snap 2nd handle to x or y axis relative to first handle
                 if (handles.size() == 2) {
                     QPointF snap_point = snapToClosestAxis(event->point - *handles[0]);
-                    *handle =  *handles[0] + snap_point;
+                    *handle_snap =  *handles[0] + snap_point;
                 } else {
                     bool was_snapped = false;
-                    if (assistant->id() == "spline") {
+                    if (m_newAssistant->id() == "spline") {
                         KisPaintingAssistantHandleSP start;
                         handles.size() == 3 ? start = handles[0] : start = handles[1];
                         QPointF snap_point = snapToClosestAxis(event->point - *start);
-                        *handle =  *start + snap_point;
+                        *handle_snap =  *start + snap_point;
                         was_snapped = true;
                     }
 
-                    if (assistant->id() == "ellipse" ||
-                        assistant->id() == "concentric ellipse" ||
-                        assistant->id() == "fisheye-point") {
+                    if (m_newAssistant->id() == "ellipse" ||
+                        m_newAssistant->id() == "concentric ellipse" ||
+                        m_newAssistant->id() == "fisheye-point") {
                         QPointF center = QLineF(*handles[0], *handles[1]).center();
                         QLineF radius = QLineF(center,*handles[0]);
                         QLineF dragRadius = QLineF(center, event->point);
                         dragRadius.setLength(radius.length());
-                        *handle = dragRadius.p2();
+                        *handle_snap = dragRadius.p2();
                         was_snapped = true;
                     }
 
-                    if (assistant->id() == "perspective") {
+                    if (m_newAssistant->id() == "perspective") {
                         qDebug() << "perspective";
                         KisPaintingAssistantHandleSP start;
                         handles.size() == 3 ? start = handles[1] : start = handles[2];
                         QPointF snap_point = snapToClosestAxis(event->point - *start);
-                        *handle =  *start + snap_point;
+                        *handle_snap =  *start + snap_point;
                         was_snapped = true;
                     }
                     return was_snapped;
