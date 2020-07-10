@@ -1220,7 +1220,6 @@ bool KisAssistantTool::snap(KoPointerEvent *event)
                     }
 
                     if (m_newAssistant->id() == "perspective") {
-                        qDebug() << "perspective";
                         KisPaintingAssistantHandleSP start;
                         handles.size() == 3 ? start = handles[1] : start = handles[2];
                         QPointF snap_point = snapToClosestAxis(event->point - *start);
