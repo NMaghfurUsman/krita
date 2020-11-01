@@ -50,6 +50,9 @@
 #include <kis_paintop_preset.h>
 #include <kis_paintop_settings.h>
 
+#include <KisResourceLocator.h>
+#include <kis_paintop_box.h>
+
 #include "ToolPresets.h"
 
 static QIcon toolIcon(const QString &toolId)
@@ -90,6 +93,7 @@ ToolPresetDocker::~ToolPresetDocker()
 void ToolPresetDocker::setViewManager(KisViewManager *kisview)
 {
     m_resourceProvider = kisview->canvasResourceProvider();
+    m_viewManager = kisview;
 }
 
 void ToolPresetDocker::setCanvas(KoCanvasBase *canvas)
@@ -146,6 +150,8 @@ void ToolPresetDocker::bnSavePressed()
         KConfigGroup grp = cfg.group(txtName->text());
         KisPaintOpSettingsSP settings = m_resourceProvider->currentPreset()->settings();
         grp.writeEntry("brush_size",settings->paintOpSize());
+        KisPaintOpPresetSP preset = m_resourceProvider->currentPreset();
+        grp.writeEntry("brush_preset",preset->resourceId());
     }
     QListWidgetItem *item = new QListWidgetItem(toolIcon(m_currentToolId), section);
     lstPresets->addItem(item);
@@ -176,6 +182,12 @@ void ToolPresetDocker::itemSelected(QListWidgetItem *item)
     if (tool && tool->inherits("KisToolPaint")) {
         KConfig cfg(createConfigFileName(m_currentToolId));
         KConfigGroup grp = cfg.group(item->text());
+
+        KoResourceSP resource = KisResourceLocator::instance()->resourceForId((int)grp.readEntry("brush_preset", -1));
+        if (resource) {
+            m_viewManager->paintOpBox()->resourceSelected(resource);
+        }
+
         m_resourceProvider->setSize(grp.readEntry("brush_size", m_resourceProvider->size()));
     }
 

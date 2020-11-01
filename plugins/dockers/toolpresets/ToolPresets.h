@@ -58,6 +58,7 @@ private Q_SLOTS:
 
 private:
     KisCanvasResourceProvider *m_resourceProvider;
+    KisViewManager *m_viewManager;
     KoCanvasBase *m_canvas {0};
     QList<QPointer<QWidget> > m_currentOptionWidgets;
     QString m_currentToolId;

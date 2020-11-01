@@ -133,6 +133,7 @@ private:
     friend class TestResourceLocator;
     friend class TestResourceModel;
     friend class Resource;
+    friend class ToolPresetDocker;
     friend class KisResourceCacheDb;
     friend class KisStorageFilterProxyModel;
     friend class KisResourceQueryMapper;
