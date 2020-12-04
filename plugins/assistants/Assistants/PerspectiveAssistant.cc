@@ -325,6 +325,36 @@ void PerspectiveAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect,
         }
     }
 
+    if (assistantVisible) {
+        gc.setTransform(converter->documentToWidgetTransform());
+        if (!getTransform(poly, transform)) {
+            // color red for an invalid transform, but not for an incomplete one
+            if(isAssistantComplete()) {
+                gc.setPen(QColor(255, 0, 0, 125));
+                gc.drawPolygon(poly);
+            } else {
+                QPainterPath path;
+                path.addPolygon(poly);
+                drawPath(gc, path, isSnappingActive());
+            }
+        } else {
+            gc.setPen(QColor(0, 0, 0, 125));
+            gc.setTransform(transform, true);
+            QPainterPath path;
+            for (int y = 0; y <= 8; ++y)
+            {
+                path.moveTo(QPointF(0.0, y * 0.125));
+                path.lineTo(QPointF(1.0, y * 0.125));
+            }
+            for (int x = 0; x <= 8; ++x)
+            {
+                path.moveTo(QPointF(x * 0.125, 0.0));
+                path.lineTo(QPointF(x * 0.125, 1.0));
+            }
+            drawPath(gc, path, isSnappingActive());
+        }
+    }
+
     gc.restore();
 
     KisPaintingAssistant::drawAssistant(gc, updateRect, converter, cached,canvas, assistantVisible, previewVisible);
@@ -332,41 +362,9 @@ void PerspectiveAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect,
 
 void PerspectiveAssistant::drawCache(QPainter& gc, const KisCoordinatesConverter *converter, bool assistantVisible)
 {
-    if (assistantVisible == false) {
-        return;
-    }
-
-    gc.setTransform(converter->documentToWidgetTransform());
-    QPolygonF poly;
-    QTransform transform;
-
-    if (!getTransform(poly, transform)) {
-        // color red for an invalid transform, but not for an incomplete one
-        if(isAssistantComplete()) {
-            gc.setPen(QColor(255, 0, 0, 125));
-            gc.drawPolygon(poly);
-        } else {
-            QPainterPath path;
-            path.addPolygon(poly);
-            drawPath(gc, path, isSnappingActive());
-        }
-    } else {
-        gc.setPen(QColor(0, 0, 0, 125));
-        gc.setTransform(transform, true);
-        QPainterPath path;
-        for (int y = 0; y <= 8; ++y)
-        {
-            path.moveTo(QPointF(0.0, y * 0.125));
-            path.lineTo(QPointF(1.0, y * 0.125));
-        }
-        for (int x = 0; x <= 8; ++x)
-        {
-            path.moveTo(QPointF(x * 0.125, 0.0));
-            path.lineTo(QPointF(x * 0.125, 1.0));
-        }
-        drawPath(gc, path, isSnappingActive());
-    }
-
+    Q_UNUSED(gc);
+    Q_UNUSED(converter);
+    Q_UNUSED(assistantVisible);
 }
 
 QPointF PerspectiveAssistant::getEditorPosition() const
