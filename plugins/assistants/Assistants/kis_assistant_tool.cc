@@ -317,6 +317,9 @@ void KisAssistantTool::beginActionImpl(KoPointerEvent *event)
                    m_handleDrag == assistant->handles()[0]){
             m_dragStart = assistant->getEditorPosition();
             m_snapIsRadial = false;
+        } else if (m_handleDrag && assistant->handles().size()>2 && assistant->id() == "three point") {
+            m_snapIsRadial = false;
+            m_dragStart = *m_handleDrag;
         }
     }
 
@@ -505,119 +508,9 @@ void KisAssistantTool::continueActionImpl(KoPointerEvent *event)
         }
 
         //this following bit sets the translations for the vanishing-point handles.
-        if(m_handleDrag && assistant->id() == "vanishing point" && assistant->sideHandles().size()==4) {
-            //for inner handles, the outer handle gets translated.
-            if (m_handleDrag == assistant->sideHandles()[0]) {
-                QLineF perspectiveline = QLineF(*assistant->handles()[0],
-                                                *assistant->sideHandles()[0]);
-
-                qreal length = QLineF(*assistant->sideHandles()[0],
-                                      *assistant->sideHandles()[1]).length();
-
-                if (length < 2.0){
-                    length = 2.0;
-                }
-
-                length += perspectiveline.length();
-                perspectiveline.setLength(length);
-                *assistant->sideHandles()[1] = perspectiveline.p2();
-            }
-            else if (m_handleDrag == assistant->sideHandles()[2]){
-                QLineF perspectiveline = QLineF(*assistant->handles()[0], *assistant->sideHandles()[2]);
-                qreal length = QLineF(*assistant->sideHandles()[2], *assistant->sideHandles()[3]).length();
-
-                if (length<2.0){
-                    length=2.0;
-                }
-
-                length += perspectiveline.length();
-                perspectiveline.setLength(length);
-                *assistant->sideHandles()[3] = perspectiveline.p2();
-            } // for outer handles, only the vanishing point is translated, but only if there's an intersection.
-            else if (m_handleDrag == assistant->sideHandles()[1]|| m_handleDrag == assistant->sideHandles()[3]){
-                QPointF vanishingpoint(0,0);
-                QLineF perspectiveline = QLineF(*assistant->sideHandles()[0], *assistant->sideHandles()[1]);
-                QLineF perspectiveline2 = QLineF(*assistant->sideHandles()[2], *assistant->sideHandles()[3]);
-
-                if (QLineF(perspectiveline2).intersect(QLineF(perspectiveline), &vanishingpoint) != QLineF::NoIntersection){
-                    *assistant->handles()[0] = vanishingpoint;
-                }
-            }// and for the vanishing point itself, only the outer handles get translated.
-            else if (m_handleDrag == assistant->handles()[0]){
-                QLineF perspectiveline = QLineF(*assistant->handles()[0], *assistant->sideHandles()[0]);
-                QLineF perspectiveline2 = QLineF(*assistant->handles()[0], *assistant->sideHandles()[2]);
-                qreal length =  QLineF(*assistant->sideHandles()[0], *assistant->sideHandles()[1]).length();
-                qreal length2 = QLineF(*assistant->sideHandles()[2], *assistant->sideHandles()[3]).length();
-
-                if (length < 2.0) {
-                    length = 2.0;
-                }
-
-                if (length2 < 2.0) {
-                    length2=2.0;
-                }
-
-                length += perspectiveline.length();
-                length2 += perspectiveline2.length();
-                perspectiveline.setLength(length);
-                perspectiveline2.setLength(length2);
-                *assistant->sideHandles()[1] = perspectiveline.p2();
-                *assistant->sideHandles()[3] = perspectiveline2.p2();
-            }
-
-        }
-        if (m_handleDrag && assistant->id() == "two point" && assistant->handles().size() >= 3 &&
-            assistant->sideHandles().size() == 8) {
-
-          QList<KisPaintingAssistantHandleSP> hndl = assistant->handles();
-          QList<KisPaintingAssistantHandleSP> side_hndl = assistant->sideHandles();
-
-          const bool far_handle_is_dragged =
-              m_handleDrag == side_hndl[1] || m_handleDrag == side_hndl[3] ||
-              m_handleDrag == side_hndl[5] || m_handleDrag == side_hndl[7];
-
-            if (far_handle_is_dragged) {
-                QLineF perspective_line_a, perspective_line_b;
-                QPointF vp_new_pos(0,0);
-                KisPaintingAssistantHandleSP vp_moved;
-                if (m_handleDrag == side_hndl[1] || m_handleDrag == side_hndl[5]) {
-                    vp_moved = hndl[0];
-                    perspective_line_a = QLineF(*side_hndl[0],*side_hndl[1]);
-                    perspective_line_b = QLineF(*side_hndl[4],*side_hndl[5]);
-                } else {
-                    vp_moved = hndl[1];
-                    perspective_line_a = QLineF(*side_hndl[3],*side_hndl[2]);
-                    perspective_line_b = QLineF(*side_hndl[6],*side_hndl[7]);
-                }
-                if (perspective_line_a.intersect(perspective_line_b, &vp_new_pos) != QLineF::NoIntersection) {
-                    *vp_moved = vp_new_pos;
-                }
-            } else {
-                QLineF perspective_line_a1;
-                QLineF perspective_line_b1;
-                QLineF perspective_line_a2;
-                QLineF perspective_line_b2;
-
-                perspective_line_a1 = QLineF(*hndl[0], *side_hndl[0]);
-                perspective_line_a1.setLength(QLineF(*side_hndl[0],*side_hndl[1]).length());
-                perspective_line_a1.translate(*side_hndl[0] - perspective_line_a1.p1());
-                *side_hndl[1] = perspective_line_a1.p2();
-
-                perspective_line_b1 = QLineF(*hndl[0], *side_hndl[4]);
-                perspective_line_b1.setLength(QLineF(*side_hndl[4],*side_hndl[5]).length());
-                perspective_line_b1.translate(*side_hndl[4] - perspective_line_b1.p1());
-                *side_hndl[5] = perspective_line_b1.p2();
-
-                perspective_line_a2 = QLineF(*hndl[1], *side_hndl[2]);
-                perspective_line_a2.setLength(QLineF(*side_hndl[2],*side_hndl[3]).length());
-                perspective_line_a2.translate(*side_hndl[2] - perspective_line_a2.p1());
-                *side_hndl[3] = perspective_line_a2.p2();
-
-                perspective_line_b2 = QLineF(*hndl[1], *side_hndl[6]);
-                perspective_line_b2.setLength(QLineF(*side_hndl[6],*side_hndl[7]).length());
-                perspective_line_b2.translate(*side_hndl[6] - perspective_line_b2.p1());
-                *side_hndl[7] = perspective_line_b2.p2();
-            }
+        if(m_handleDrag && (assistant->id() == "vanishing point" || assistant->id() == "two point")) {
+            QSharedPointer<NPointPerspective> pointpersp = qSharedPointerCast<NPointPerspective>(assistant);
+            pointpersp->realignSideHandles(m_handleDrag);
         }
         // The following section handles rulers that have been set to a
         // constant length
@@ -687,52 +580,10 @@ void KisAssistantTool::addAssistant()
 {
     m_canvas->paintingAssistantsDecoration()->addAssistant(m_newAssistant);
 
-    // generate the side handles for the Two Point assistant
-    if (m_newAssistant->id() == "two point"){
-        QList<KisPaintingAssistantHandleSP> handles = m_newAssistant->handles();
-        QSharedPointer<TwoPointAssistant> assis = qSharedPointerCast<TwoPointAssistant>(m_newAssistant);
-
-        if (*handles[0] == *handles[1] || *handles[1] == *handles[2]) {
-            // Place handles in sensible default position if any of
-            // them are overlapping (maybe because user
-            // double-clicked)
-            const QTransform transform = m_canvas->coordinatesConverter()->documentToWidgetTransform();
-            const QTransform inverted = transform.inverted();
-            const int size = inverted.map(QPointF(m_canvas->canvasWidget()->width(),0)).x();
-            *handles[0] = *handles[2] - QPointF(-size/3,0);
-            *handles[1] = *handles[2] - QPointF(size/3,0);
-        }
-
-        const QPointF p1 = *handles[0];
-        const QPointF p2 = *handles[1];
-        const QPointF p3 = *handles[2];
-
-        qreal size = 0;
-        QTransform t = assis->localTransform(p1,p2,p3,&size);
-        QTransform inv = t.inverted();
-
-        if (t.map(p1).x() * t.map(p2).x() > 0) {
-            // Put third handle between first and second if user
-            // placed it outside of them, then re-define the transform
-            const QLineF horizon = QLineF(t.map(p1),t.map(p2));
-            const QPointF origin = QPointF(horizon.center().x(),0);
-            *handles[2] = inv.map(origin);
-            t = assis->localTransform(p1,p2,*handles[2],&size);
-            inv = t.inverted();
-        }
-
-        const QPointF above = inv.map(QPointF(0,t.map(p1).y()+size));
-        const QPointF below = inv.map(QPointF(0,t.map(p1).y()-size));
-
-        Q_FOREACH (QPointF side, QList<QPointF>({above,below})) {
-            Q_FOREACH (QPointF vp, QList<QPointF>({p1, p2})) {
-                QLineF bar = QLineF(side, vp);
-                m_newAssistant->addHandle(new KisPaintingAssistantHandle(bar.pointAt(0.8)), HandleType::SIDE);
-                m_newAssistant->addHandle(new KisPaintingAssistantHandle(bar.pointAt(0.4)), HandleType::SIDE);
-            }
-        }
+    if (m_newAssistant->id() == "two point" ||
+        m_newAssistant->id() == "three point"){
+        qSharedPointerCast<NPointPerspective>(m_newAssistant)->initSideHandles();
     }
-
 
     QList<KisPaintingAssistantSP> assistants = m_canvas->paintingAssistantsDecoration()->assistants();
     KUndo2Command *addAssistantCmd = new EditAssistantsCommand(m_canvas, m_origAssistantList, KisPaintingAssistant::cloneAssistantList(assistants), EditAssistantsCommand::ADD, assistants.indexOf(m_newAssistant));
@@ -1696,93 +1547,9 @@ bool KisAssistantTool::snap(KoPointerEvent *event)
         KisPaintingAssistantSP selectedAssistant = canvasDecoration->selectedAssistant();
         QList<KisPaintingAssistantHandleSP> handles = selectedAssistant->handles();
 
-        if (selectedAssistant->id() == "two point" && m_handleDrag != handles[2] &&
-            event->modifiers() != Qt::ShiftModifier) {
-            // Snapping interactions that are specific to the two point assistant.
-            // Skip this code block when only Shift is pressed, as
-            // Shift means we only need closest-axis snapping.
-
-            QSharedPointer<TwoPointAssistant> assis = qSharedPointerCast<TwoPointAssistant>(selectedAssistant);
-            KisPaintingAssistantHandleSP handleOpp = m_handleDrag == handles[0] ? handles[1] : handles[0];
-            const QPointF prevPoint = m_currentAdjustment.isNull() ? m_dragStart : m_currentAdjustment;
-
-            qreal size = 0;
-            const QTransform t = assis->localTransform(prevPoint,*handleOpp,*handles[2],&size);
-            const QTransform inv = t.inverted();
-
-            // Exact alignment matters here, so fudge horizon line
-            // to be perfectly horizontal instead of trusting the
-            // QTransform calculation to do it
-            const QLineF horizon = QLineF(t.map(prevPoint), QPointF(t.map(*handleOpp).x(),t.map(prevPoint).y()));
-            const QPointF sp = QPointF(0,horizon.p1().y()+size);
-
-            const bool preserve_distortion_snap = event->modifiers() == Qt::ControlModifier;
-            const bool preserve_left_right_ratio_snap = event->modifiers() == (Qt::ControlModifier|Qt::ShiftModifier);
-            const bool preserve_horizon_snap = event->modifiers() == Qt::AltModifier;
-
-            QPointF snap_point;
-            QPointF opp_snap_point;
-            QLineF sp_to_opp_vp;
-
-            if (preserve_distortion_snap) {
-                const QLineF sp_to_vp = QLineF(sp, t.map(*m_handleDrag));
-                sp_to_opp_vp = sp_to_vp.normalVector();
-                sp_to_vp.intersect(horizon,&snap_point);
-            } else if (preserve_left_right_ratio_snap) {
-                const QLineF prev_sp_to_vp = QLineF(sp, horizon.p1());
-                QLineF new_sp_to_vp = prev_sp_to_vp.translated(t.map(*m_handleDrag)-sp);
-                QPointF new_sp;
-                new_sp_to_vp.intersect(QLineF(QPoint(0,0),QPointF(0,1)),&new_sp);
-                sp_to_opp_vp = new_sp_to_vp.normalVector().translated(new_sp-new_sp_to_vp.p1());
-                new_sp_to_vp.intersect(horizon,&snap_point);
-            } else if (preserve_horizon_snap) {
-                snap_point = QPointF(t.map(*m_handleDrag).x(),horizon.p1().y());
-                sp_to_opp_vp = QLineF(sp,QPointF(t.map(prevPoint).x(),horizon.p1().y())).normalVector();
-            }
-
-            // The snapping modes must be robust against falling into
-            // invalid configurations, so test if the new snap points
-            // actually do make sense
-            const bool no_intersection =
-                // NB: opp_snap_point is initialized here
-                sp_to_opp_vp.intersect(horizon, &opp_snap_point) == QLineF::NoIntersection;
-            const bool origin_is_between =
-                (snap_point.x() < 0 && opp_snap_point.x() > 0) ||
-                (snap_point.x() > 0 && opp_snap_point.x() < 0);
-            const bool null_opp_point =
-                qFuzzyIsNull(opp_snap_point.x()) ||
-                qFuzzyIsNull(opp_snap_point.y());
-            const bool overlapping_snap_points =
-                qFuzzyCompare(opp_snap_point.x(),snap_point.x());
-
-            // Revert to original state if new points are invalid
-            if (!origin_is_between || no_intersection || null_opp_point || overlapping_snap_points) {
-                *m_handleDrag = m_dragStart;
-                QPointF oppStart;
-                // Use different recovery method for different
-                // snapping modes
-                if (preserve_distortion_snap) {
-                    sp_to_opp_vp = QLineF(sp, t.map(m_dragStart)).normalVector();
-                    sp_to_opp_vp.intersect(horizon, &oppStart);
-                } else {
-                    const QPointF p1 = t.map(m_dragStart);
-                    const qreal p2x = preserve_horizon_snap ? t.map(*handleOpp).x() : -p1.x();
-                    const QPointF p2 = QPointF(p2x,p1.y());
-                    const QLineF new_horizon = QLineF(p1,p2);
-                    const qreal new_size = sqrt(pow(new_horizon.length()/2.0,2) -
-                                                pow(abs(new_horizon.center().x()),2));
-                    const QPointF new_sp = QPointF(0,horizon.p1().y()+new_size);
-                    sp_to_opp_vp = QLineF(new_sp, t.map(m_dragStart)).normalVector();
-                }
-                sp_to_opp_vp.intersect(horizon, &oppStart);
-                *handleOpp=inv.map(oppStart);
-                m_currentAdjustment = QPointF(0,0); // clear
-            } else {
-                // otherwise use the new configuration if it's valid
-                *m_handleDrag = inv.map(snap_point);
-                *handleOpp = inv.map(opp_snap_point);
-                m_currentAdjustment = *m_handleDrag;
-            }
+        if (selectedAssistant->id() == "two point" ||
+            selectedAssistant->id() == "three point") {
+            qSharedPointerCast<NPointPerspective>(selectedAssistant)->realignVanishingPoint(m_handleDrag, event, &m_dragStart, &m_currentAdjustment);
         } else if (m_snapIsRadial == true) {
             QLineF dragRadius = QLineF(m_dragStart, event->point);
             dragRadius.setLength(m_radius.length());

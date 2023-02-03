@@ -15,7 +15,9 @@ set(kritaassistanttool_SOURCES
     SplineAssistant.cc
     VanishingPointAssistant.cc
     EditAssistantsCommand.cpp
+    NPointPerspective.cc
     TwoPointAssistant.cc
+    ThreePointAssistant.cc
     PerspectiveEllipseAssistant.cc
 )
 

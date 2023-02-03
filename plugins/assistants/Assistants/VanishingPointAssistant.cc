@@ -22,14 +22,15 @@
 #include <kis_algebra_2d.h>
 #include <kis_dom_utils.h>
 #include <math.h>
+#include <qglobal.h>
 
 VanishingPointAssistant::VanishingPointAssistant()
-    : KisPaintingAssistant("vanishing point", i18n("Vanishing Point assistant"))
+    : NPointPerspective("vanishing point", i18n("Vanishing Point assistant"))
 {
 }
 
 VanishingPointAssistant::VanishingPointAssistant(const VanishingPointAssistant &rhs, QMap<KisPaintingAssistantHandleSP, KisPaintingAssistantHandleSP> &handleMap)
-    : KisPaintingAssistant(rhs, handleMap)
+    : NPointPerspective(rhs, handleMap)
     , m_canvas(rhs.m_canvas)
     , m_referenceLineDensity(rhs.m_referenceLineDensity)
 {
@@ -345,6 +346,38 @@ bool VanishingPointAssistant::loadCustomXml(QXmlStreamReader* xml)
     return true;
 }
 
+void VanishingPointAssistant::realignSideHandles(KisPaintingAssistantHandleSP dragged_handle) {
+    //for inner handles, the outer handle gets translated.
+    const bool far_handle_is_dragged =
+        dragged_handle == sideHandles()[1] || dragged_handle == sideHandles()[3];
+
+    if (far_handle_is_dragged) {
+        QLineF perspective_line_a, perspective_line_b;
+        QPointF vp_new_pos(0,0);
+        perspective_line_a = QLineF(*sideHandles()[0],*sideHandles()[1]);
+        perspective_line_b = QLineF(*sideHandles()[2],*sideHandles()[3]);
+        if (perspective_line_a.intersect(perspective_line_b, &vp_new_pos) != QLineF::NoIntersection) {
+            *handles()[0] = vp_new_pos;
+        }
+    } else {
+        QLineF perspective_line_a1;
+        QLineF perspective_line_b1;
+
+        perspective_line_a1 = QLineF(*handles()[0], *sideHandles()[0]);
+        perspective_line_a1.setLength(QLineF(*sideHandles()[0],*sideHandles()[1]).length());
+        perspective_line_a1.translate(*sideHandles()[0] - perspective_line_a1.p1());
+        *sideHandles()[1] = perspective_line_a1.p2();
+
+        perspective_line_b1 = QLineF(*handles()[0], *sideHandles()[2]);
+        perspective_line_b1.setLength(QLineF(*sideHandles()[2],*sideHandles()[3]).length());
+        perspective_line_b1.translate(*sideHandles()[2] - perspective_line_b1.p1());
+        *sideHandles()[3] = perspective_line_b1.p2();
+    }
+}
+
+void VanishingPointAssistant::realignVanishingPoint(KisPaintingAssistantHandleSP dragged_handle, KoPointerEvent* event, QPointF* drag_start, QPointF* adjustment) {
+    Q_UNIMPLEMENTED();
+}
 
 VanishingPointAssistantFactory::VanishingPointAssistantFactory()
 {

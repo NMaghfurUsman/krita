@@ -15,6 +15,8 @@
 #include <QPolygonF>
 #include <QLineF>
 #include <QTransform>
+#include "NPointPerspective.h"
+
 /* Design:
  *The idea behind the vanishing point ruler is that in a perspective deformed landscape, a set of parallel
  *lines al share a single vanishing point.
@@ -30,7 +32,7 @@
  */
 //class VanishingPoint;
 
-class VanishingPointAssistant : public KisPaintingAssistant
+class VanishingPointAssistant : public NPointPerspective
 {
 public:
     VanishingPointAssistant();
@@ -55,6 +57,8 @@ public:
 
     void saveCustomXml(QXmlStreamWriter* xml) override;
     bool loadCustomXml(QXmlStreamReader* xml) override;
+    void realignSideHandles(KisPaintingAssistantHandleSP dragged_handle) override;
+    void realignVanishingPoint(KisPaintingAssistantHandleSP dragged_handle, KoPointerEvent* event, QPointF* drag_start, QPointF* adjustment) override;
 
 protected:
     void drawAssistant(QPainter& gc, const QRectF& updateRect, const KisCoordinatesConverter* converter, bool  cached = true,KisCanvas2* canvas=nullptr, bool assistantVisible=true, bool previewVisible=true) override;

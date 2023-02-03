@@ -223,7 +223,7 @@ public:
     /**
      * This will render the final output. The drawCache does rendering most of the time so be sure to check that
      */
-    void drawPath(QPainter& painter, const QPainterPath& path, bool drawActive=true);
+    void drawPath(QPainter& painter, const QPainterPath& path, bool drawActive=true, bool secondaryLine=false);
     void drawPreview(QPainter& painter, const QPainterPath& path);
     // draw a path in a red color, signalizing incorrect state
     void drawError(QPainter& painter, const QPainterPath& path);

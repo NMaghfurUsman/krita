@@ -161,6 +161,7 @@ struct KisPaintingAssistant::Private {
 
 
     const int previewLineWidth {1};
+    const int secondaryLineWidth {1};
     const int mainLineWidth {2}; // for "drawPath" etc.
     const int errorLineWidth {2};
 
@@ -335,7 +336,7 @@ void KisPaintingAssistant::setEditorWidgetOffset(QPointF offset)
 }
 
 
-void KisPaintingAssistant::drawPath(QPainter& painter, const QPainterPath &path, bool isSnappingOn)
+void KisPaintingAssistant::drawPath(QPainter& painter, const QPainterPath &path, bool isSnappingOn, bool secondaryLine)
 {
 
     QColor paintingColor = effectiveAssistantColor();
@@ -345,7 +346,7 @@ void KisPaintingAssistant::drawPath(QPainter& painter, const QPainterPath &path,
     }
 
     painter.save();
-    QPen pen_a(paintingColor, d->mainLineWidth);
+    QPen pen_a(paintingColor, secondaryLine ? d->secondaryLineWidth : d->mainLineWidth);
     pen_a.setCosmetic(true);
     painter.setPen(pen_a);
     painter.drawPath(path);
