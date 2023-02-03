@@ -21,6 +21,7 @@
 #include "ConcentricEllipseAssistant.h"
 #include "FisheyePointAssistant.h"
 #include "TwoPointAssistant.h"
+#include "ThreePointAssistant.h"
 #include "PerspectiveEllipseAssistant.h"
 //#include "mesh_assistant.h"
 
@@ -42,6 +43,7 @@ AssistantToolPlugin::AssistantToolPlugin(QObject *parent, const QVariantList &)
     KisPaintingAssistantFactoryRegistry::instance()->add(new ConcentricEllipseAssistantFactory);
     KisPaintingAssistantFactoryRegistry::instance()->add(new FisheyePointAssistantFactory);
     KisPaintingAssistantFactoryRegistry::instance()->add(new TwoPointAssistantFactory);
+    KisPaintingAssistantFactoryRegistry::instance()->add(new ThreePointAssistantFactory);
     KisPaintingAssistantFactoryRegistry::instance()->add(new PerspectiveEllipseAssistantFactory);
 //    KisPaintingAssistantFactoryRegistry::instance()->add(new MeshAssistantFactory);
 }
