@@ -25,6 +25,8 @@
 #include <kis_assert.h>
 #include <QtMath>
 #include <qglobal.h>
+#include <QVector3D>
+#include <QQuaternion>
 
 class ThreePoint
 {
@@ -189,11 +191,54 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
             path.lineTo(initialTransform.map(p1));
         }
 
-        // drawPreview(gc,previewPath);
-        // drawPath(gc, path, isSnappingActive());
+        // copied from TwoPointassistant
+        // draw temp vanishing point lines
+        if (handles().size() <= 3) {
+            QPainterPath path;
+            int tempDensity = m_gridDensity * 10; // the vanishing point density seems visibly more dense, hence let's make it less dense
+            QRect viewport = gc.viewport();
+
+            for (int i = 0; i < handles().size(); i++) {
+                const QPointF p = initialTransform.map(*handles()[i]);
+                for (int currentAngle=0; currentAngle <= 180; currentAngle = currentAngle + tempDensity) {
+
+                    // determine the correct angle based on the iteration
+                    float xPos = cos(currentAngle * M_PI / 180);
+                    float yPos = sin(currentAngle * M_PI / 180);
+                    float length = 100;
+                    QPointF unit = QPointF(length*xPos, length*yPos);
+
+                    // find point
+                    QLineF snapLine = QLineF(p, p + unit);
+                    if (KisAlgebra2D::intersectLineRect(snapLine, viewport, false)) {
+                        // make a line from VP center to edge of canvas with that angle
+
+                        path.moveTo(snapLine.p1());
+                        path.lineTo(snapLine.p2());
+                    }
+
+                    QLineF snapLine2 = QLineF(p, p - unit);
+                    if (KisAlgebra2D::intersectLineRect(snapLine2, viewport, false)) {
+                        // make a line from VP center to edge of canvas with that angle
+
+                        path.moveTo(snapLine2.p1());
+                        path.lineTo(snapLine2.p2());
+                    }
+
+
+                }
+                if (handles().size() >= 3) {
+                    if (!isValid()) {
+                        drawPreview(gc, path);//and we draw the preview.
+                    }
+                } else {
+                        drawPreview(gc, path);//and we draw the preview.
+                }
+            }
+        }
+
 
         if (handles().size() == 3) {
-            // path = QPainterPath(); // clear
             const QPointF p3 = *handles()[2];
 
             if (assistantVisible && isEditing) {
@@ -201,10 +246,6 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 QLineF vanishingLineB = initialTransform.map(QLineF(p3,p2));
                 KisAlgebra2D::cropLineToConvexPolygon(vanishingLineA, viewportAndLocalPoly, true, true);
                 KisAlgebra2D::cropLineToConvexPolygon(vanishingLineB, viewportAndLocalPoly, true, true);
-                path.moveTo(vanishingLineA.p1());
-                path.lineTo(vanishingLineA.p2());
-                path.moveTo(vanishingLineB.p1());
-                path.lineTo(vanishingLineB.p2());
             }
 
             if (assistantVisible && !isEditing) {
@@ -213,20 +254,15 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 drawX(gc, initialTransform.map(p3));
             }
 
-            // Draw orthocenter and cone of vision
             if (isValid()) {
 
-                // Transform document space-->local persp space
-                // Makes calculations easier
                 const QTransform t = localTransform(p1,p2,p3);
                 const QPointF vp_a = t.map(p1);
                 const QPointF vp_b = t.map(p2);
 
-                // Transforms local space-->screen space
-                // Used when drawing
                 const QTransform inv = t.inverted()*initialTransform;
+
                 const QPointF ortho = orthocenter(vp_a, vp_b, t.map(p3));
-                drawX(gc, inv.map(ortho));
 
                 const qreal mid = QLineF(vp_a, vp_b).pointAt(0.5).x();
                 const qreal radius = QLineF(vp_a, vp_b).length() / 2.0;
@@ -235,91 +271,101 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 const qreal cov_size = sqrt(sp_distance*sp_distance - theta*theta);
 
                 if (isEditing) {
-
-                    // draw 90 degree cone of vision (cov)
+                    drawX(gc, inv.map(ortho)); // center of vision
                     const qreal actual_size = inv.map(QLineF(ortho, QPointF(cov_size, ortho.y()))).length();
                     const QPointF cov_corner = QPointF(actual_size,actual_size);
                     const QRectF cov_circle = QRectF(inv.map(ortho) - cov_corner, inv.map(ortho) + cov_corner);
-
-                    path.moveTo(inv.map(ortho - QPointF(0,cov_size)));
-                    path.lineTo(inv.map(ortho + QPointF(0,cov_size)));
-                    path.moveTo(inv.map(ortho - QPointF(cov_size, 0)));
-                    path.lineTo(inv.map(ortho + QPointF(cov_size, 0)));
                     path.moveTo(inv.map(ortho));
-                    path.addEllipse(cov_circle);
-
-                    // station point guide
-                    const QPointF sp = inv.map(QPointF(0,vp_a.y()+sp_distance));
-                    path.moveTo(sp);
-                    path.lineTo(initialTransform.map(p1));
-                    path.moveTo(sp);
-                    path.lineTo(initialTransform.map(p2));
-
-                    // vertical tilt guide
-                    const QPointF vsp = inv.map(QPointF(ortho + QPointF(cov_size,0)));;
-                    const QPointF pp = inv.map(QPointF(0,vp_a.y()));
-                    path.moveTo(vsp);
-                    path.lineTo(pp);
-                    path.moveTo(vsp);
-                    path.lineTo(initialTransform.map(p3));
+                    path.addEllipse(cov_circle); // 90 degree cone of vision
                 }
 
-                drawPath(gc, path, isSnappingActive(), true);
-                path = QPainterPath();
-
-                // Draw gridlines
                 const QPointF principal_pt = QPointF(0,vp_a.y());
-                const QPointF cov_edge = QPointF(cov_size, 0);
+                const qreal principal_pt_dst = ortho.y() - principal_pt.y();
 
+                // adistance to image plane
+                const qreal dst = principal_pt_dst / qTan(qAsin(principal_pt_dst / sp_distance));
 
-                Q_FOREACH(QPointF vertical_sp, // Use both left and right vertical SP
-                          QList<QPointF>({ortho + cov_edge, ortho - cov_edge})) {
+                // orthocentr as origin makes calculations easier to write
+                QTransform t_ortho = QTransform();
+                t_ortho.translate(-ortho.x(), -ortho.y());
 
-                    // Represents line to the edge of 90 degree cone of vision
-                    QLineF line = QLineF(vertical_sp, principal_pt);
-                    line.setAngle(line.angle() + 45);
+                // orthonormal vectors projecting from center of projection to VPs on image plane
+                const QVector3D p1_vec = QVector3D(QVector2D(t_ortho.map(vp_a)),dst);
+                const QVector3D p2_vec = QVector3D(QVector2D(t_ortho.map(vp_b)),dst);
+                const QVector3D p3_vec = QVector3D(QVector2D(t_ortho.map(QPointF(0,0))),dst);
 
-                    // Inner angle between vertical_sp--->ortho and vertical_sp--->edge of cov, as a value between 0 and 180
-                    const qreal vert_angle = qRadiansToDegrees(qAcos(qCos(qDegreesToRadians(line.angleTo(QLineF(vertical_sp, ortho))))));
+                // use the vanishing point vectors to recover the camera's orientation
+                const qreal pitch_angle = qRadiansToDegrees(qAsin(qAbs(p3_vec.z()/p3_vec.length())));
+                const qreal yaw_angle = qRadiansToDegrees(qAsin(qAbs(p1_vec.x()/p1_vec.length())));
+                const QQuaternion pitch = QQuaternion::fromAxisAndAngle(QVector3D(1,0,0), pitch_angle * (vp_a.y() < 0 ? 1 : -1));
+                const QQuaternion yaw = QQuaternion::fromAxisAndAngle(QVector3D(0,1,0), -yaw_angle);
+                const QQuaternion orientation = pitch * yaw;
 
-                    // Represents point on floor/ceiling.
-                    // It appears visually fixed when turning left/right
-                    QPointF base_pt = QPointF();
-                    line.intersect(QLineF(principal_pt, ortho), &base_pt);
-                    drawX(gc, inv.map(base_pt));
-
-                    qreal cov_edge_dst = sqrt(2*cov_size*cov_size); // sqrt(a^2 + b^2)
-                    qreal base_pt_dst = cov_edge_dst * qCos(qDegreesToRadians(vert_angle));
-                    qreal visual_angle = qRadiansToDegrees(qAtan( cov_size / base_pt_dst ));
-                    const qreal cone_visual_radius = cov_size * qTan(qDegreesToRadians(visual_angle));
-
-                    const QPointF sp = QPointF(0,vp_a.y()+sp_distance);
-                    using VPOpp = QList<QPointF>;
-                    Q_FOREACH(VPOpp vps, QList<VPOpp>({{vp_a,vp_b},{vp_b,vp_a}})) {
-                        const QPointF horizontal_vp = vps[0];
-                        const QPointF horizontal_vp_opp = vps[1];
-                        const qreal horz_angle = qRadiansToDegrees(qAsin(qSin(qDegreesToRadians(QLineF(sp,horizontal_vp).angle()))));
-                        const qreal interval = cone_visual_radius / qCos(qDegreesToRadians(horz_angle));
-                        const QPointF interval_vec = QPointF(interval, 0);
-                        path.moveTo(inv.map(base_pt));
-                        path.lineTo(inv.map(horizontal_vp));
-                        for (int i = -10; i <= 10; i++) {
-                            const QPointF next_base_pt = base_pt + i * interval_vec;
-                            QLineF gridline = inv.map(QLineF(next_base_pt, horizontal_vp_opp));
+                // draw floor+ceiling gridlines
+                const qreal height = dst;
+                const qreal base = dst;
+                const QVector3D translation = pitch.rotatedVector(QVector3D(0,0,0));
+                const int grid_size = 50;
+                for (int i = -grid_size; i < grid_size; i++) {
+                    for (QPointF vp : QList<QPointF>({p1,p2})) {
+                        for (int side : QList<int>({1, -1})) {
+                            const QVector3D pt = orientation.rotatedVector(QVector3D(i*base,side*height,i*base)) + translation;
+                            const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
+                            bool diverge = ((t_ortho.inverted().map(projection).y() - t.map(vp).y()) < 0);
+                            const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
+                            QLineF gridline = QLineF(initialTransform.map(vp), projection_d);
                             KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, true, true);
-                            if (vert_angle < 90) {
-                                path.moveTo(gridline.p1());
-                                path.lineTo(inv.map(horizontal_vp_opp));
-                            } else {
-                                path.moveTo(gridline.p2());
-                                path.lineTo(inv.map(horizontal_vp_opp));
+
+                            if (!gridline.isNull()) {
+                                if (diverge) {
+                                    path.moveTo(initialTransform.map(vp));
+                                    path.lineTo(side == 1 ? gridline.p1() : gridline.p2());
+                                } else {
+                                    path.moveTo(initialTransform.map(vp));
+                                    path.lineTo(side == 1 ? gridline.p2() : gridline.p1());
+                                }
                             }
-
                         }
-
                     }
+                }
 
-                    drawX(gc, inv.map(vertical_sp));
+                // wall gridlines (vertical lines only)
+                const int wall_dst = 5;
+                for (int side : QList<int>({-1,1})) {
+                    const QVector3D pt_zx = orientation.rotatedVector(QVector3D(side*wall_dst*base,0,side*wall_dst*base)) + translation;
+                    const QPointF projection_zx = QPointF(pt_zx.x()/pt_zx.z()*dst, pt_zx.y()/pt_zx.z()*dst);
+                    for (int i = -wall_dst; i <= wall_dst; i++) {
+                        const QVector3D pt_z = orientation.rotatedVector(QVector3D(side*wall_dst*base,0,i*base)) + translation;
+                        const QVector3D pt_x = orientation.rotatedVector(QVector3D(i*base,0,side*wall_dst*base)) + translation;
+                        const QPointF projection_z = QPointF(pt_z.x()/pt_z.z()*dst, pt_z.y()/pt_z.z()*dst);
+                        const QPointF projection_x = QPointF(pt_x.x()/pt_x.z()*dst, pt_x.y()/pt_x.z()*dst);
+                        const QPointF projection_z_d = inv.map(t_ortho.inverted().map(projection_z));
+                        const QPointF projection_x_d = inv.map(t_ortho.inverted().map(projection_x));
+                        QLineF gridline_z = QLineF(initialTransform.map(p3), projection_z_d);
+                        QLineF gridline_x = QLineF(initialTransform.map(p3), projection_x_d);
+                        KisAlgebra2D::cropLineToConvexPolygon(gridline_z, viewportAndLocalPoly, true, true);
+                        KisAlgebra2D::cropLineToConvexPolygon(gridline_x, viewportAndLocalPoly, true, true);
+                        if (!gridline_z.isNull()) {
+                            path.moveTo(initialTransform.map(p3));
+                            if (projection_z.x() >= projection_zx.x() || i == side*wall_dst) {
+                                const QPointF grid_p2 = side == 1 ? gridline_z.p2() : gridline_z.p1();
+                                path.lineTo(grid_p2);
+                            } else {
+                                const QPointF grid_p2 = side == 1 ? gridline_z.p1() : gridline_z.p2();
+                                path.lineTo(grid_p2);
+                            }
+                        }
+                        if (!gridline_x.isNull()) {
+                            path.moveTo(initialTransform.map(p3));
+                            if (projection_x.x() <= projection_zx.x() || i == side*wall_dst) {
+                                const QPointF grid_p2 = side == 1 ? gridline_x.p2() : gridline_x.p1();
+                                path.lineTo(grid_p2);
+                            } else {
+                                const QPointF grid_p2 = side == 1 ? gridline_x.p1() : gridline_x.p2();
+                                path.lineTo(grid_p2);
+                            }
+                        }
+                    }
                 }
 
                 drawPath(gc, path, isSnappingActive(), true);
@@ -410,39 +456,103 @@ void ThreePointAssistant::realignSideHandles(KisPaintingAssistantHandleSP dragge
 }
 
 void ThreePointAssistant::realignVanishingPoint(KisPaintingAssistantHandleSP dragged_handle, KoPointerEvent* event, QPointF* drag_start, QPointF* adjustment) {
-    KisPaintingAssistantHandleSP handleOpp =
-        dragged_handle == handles()[FirstHandle] ? handles()[SecondHandle] : handles()[FirstHandle];
-    const QPointF prevPoint = adjustment->isNull() ? *drag_start : *adjustment;
 
-    const QTransform t = localTransform(prevPoint, *handleOpp, *handles()[VerticalHandle]);
-    const QTransform inv = t.inverted();
+    if (dragged_handle != handles()[VerticalHandle]) {
+        KisPaintingAssistantHandleSP handleOpp =
+            dragged_handle == handles()[FirstHandle] ? handles()[SecondHandle] : handles()[FirstHandle];
+        const QPointF prevPoint = adjustment->isNull() ? *drag_start : *adjustment;
 
-    const QPointF vp_a = t.map(prevPoint);
-    const QPointF vp_b = t.map(*handleOpp);
-    const QLineF horizon = QLineF(vp_a, vp_b);
-    const qreal mid = QLineF(vp_a, vp_b).pointAt(0.5).x();
-    const qreal radius = QLineF(vp_a, vp_b).length() / 2.0;
-    const qreal sp_distance = sqrt(radius*radius - mid*mid);
-    const QPointF sp = QPointF(0, vp_a.y()+sp_distance);
+        const QTransform t = localTransform(prevPoint, *handleOpp, *handles()[VerticalHandle]);
+        const QTransform inv = t.inverted();
 
-    const bool preserve_distortion_snap = event->modifiers() == Qt::ControlModifier;
-    QPointF snap_point;
-    QPointF opp_snap_point;
-    QLineF sp_to_opp_vp;
+        const QPointF vp_a = t.map(prevPoint);
+        const QPointF vp_b = t.map(*handleOpp);
+        const QLineF horizon = QLineF(vp_a, vp_b);
+        const qreal mid = QLineF(vp_a, vp_b).pointAt(0.5).x();
+        const qreal radius = QLineF(vp_a, vp_b).length() / 2.0;
+        const qreal sp_distance = sqrt(radius*radius - mid*mid);
+        const QPointF sp = QPointF(0, vp_a.y()+sp_distance);
 
-    if (preserve_distortion_snap) {
-        const QLineF sp_to_vp = QLineF(sp, t.map(*dragged_handle));
-        sp_to_opp_vp = sp_to_vp.normalVector();
-        sp_to_vp.intersect(horizon,&snap_point);
+        const bool preserve_distortion_snap = event->modifiers() == Qt::ControlModifier;
+        QPointF snap_point;
+        QPointF opp_snap_point;
+        QLineF sp_to_opp_vp;
+
+        if (preserve_distortion_snap) {
+            const QLineF sp_to_vp = QLineF(sp, t.map(*dragged_handle));
+            sp_to_opp_vp = sp_to_vp.normalVector();
+            sp_to_vp.intersect(horizon,&snap_point);
+
+            const bool no_intersection =
+              // NB: opp_snap_point is initialized here
+              sp_to_opp_vp.intersect(horizon, &opp_snap_point) == QLineF::NoIntersection;
+
+            *dragged_handle = inv.map(snap_point);
+            *handleOpp = inv.map(opp_snap_point);
+        }
+        *adjustment = *dragged_handle; // clear
+    } else {
+        const QPointF prevPoint = adjustment->isNull() ? *drag_start : *adjustment;
+
+        const QTransform t = localTransform(*handles()[FirstHandle], *handles()[SecondHandle], prevPoint);
+        const QTransform inv = t.inverted();
+
+        const QPointF vp_a = t.map(*handles()[FirstHandle]);
+        const QPointF vp_b = t.map(*handles()[SecondHandle]);
+        const QLineF vertical = QLineF(QPointF(0,0), QPointF(0,vp_a.y()));
+        const qreal mid = QLineF(vp_a, vp_b).pointAt(0.5).x();
+        const qreal radius = QLineF(vp_a, vp_b).length() / 2.0;
+        const qreal sp_distance = sqrt(radius*radius - mid*mid);
+        const QPointF sp = QPointF(0, vp_a.y()+sp_distance);
+        const QPointF ortho = orthocenter(vp_a, vp_b, t.map(prevPoint));
+        const qreal theta = vp_a.y() - ortho.y();
+        const qreal cov_size = sqrt(sp_distance*sp_distance - theta*theta);
+        const bool preserve_distortion_snap = event->modifiers() == Qt::ControlModifier;
+
+        QPointF snap_point;
+        QLineF vsp_to_pp;
+        QPointF pp;
+        QPointF snap_point_a;
+        QPointF snap_point_b;
+        const QPointF vsp = QPointF(0,ortho.y()) + QPointF(cov_size,0);
+        QLineF vsp_to_vvp = QLineF(vsp, t.map(*dragged_handle));
+
+        if (preserve_distortion_snap) {
+            vsp_to_vvp.intersect(vertical,&snap_point);
+            snap_point = QPointF(0,snap_point.y());
+            vsp_to_vvp = QLineF(vsp, snap_point);
+            vsp_to_pp = vsp_to_vvp.normalVector();
+            vsp_to_pp.intersect(vertical, &pp);
+            vsp_to_pp.setP2(pp);
+            const QLineF horizon = QLineF(pp, pp+QPointF(10,0));
+            QLineF sp_to_vp_a = QLineF(sp, vp_a);
+            QLineF sp_to_vp_b = QLineF(sp, vp_b);
+
+            qreal new_sp_distance = vsp_to_pp.length();
+            QPointF new_sp = QPointF(0, pp.y() + new_sp_distance);
+            sp_to_vp_a.translate(new_sp - sp_to_vp_a.p1());
+            sp_to_vp_b.translate(new_sp - sp_to_vp_b.p1());
+            sp_to_vp_a.intersect(horizon, &snap_point_a);
+            sp_to_vp_b.intersect(horizon, &snap_point_b);
+
+            vsp_to_pp = QLineF(vsp,pp);
+            vsp_to_vvp = vsp_to_pp.normalVector();
+            vsp_to_vvp.intersect(vertical,&snap_point);
+
+            const QLineF altitude_a = QLineF(snap_point_a, ortho);
+            const QLineF altitude_b = QLineF(snap_point_b, ortho);
+            QLineF vl_a = altitude_a.normalVector();
+            vl_a.translate(snap_point_b - snap_point_a);
+            QLineF vl_b = altitude_b.normalVector();
+            vl_b.translate(snap_point_a - snap_point_b);
+            vl_a.intersect(vl_b, &snap_point);
+
+            *handles()[FirstHandle] = inv.map(snap_point_a);
+            *handles()[SecondHandle] = inv.map(snap_point_b);
+            *dragged_handle = inv.map(snap_point);
+        }
+        *adjustment = *dragged_handle; // clear
     }
-
-    const bool no_intersection =
-        // NB: opp_snap_point is initialized here
-        sp_to_opp_vp.intersect(horizon, &opp_snap_point) == QLineF::NoIntersection;
-
-    *dragged_handle = inv.map(snap_point);
-    *handleOpp = inv.map(opp_snap_point);
-    *adjustment = *dragged_handle; // clear
 }
 
 
