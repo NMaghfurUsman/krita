@@ -279,6 +279,9 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                     path.addEllipse(cov_circle); // 90 degree cone of vision
                 }
 
+                drawPath(gc, path, isSnappingActive(), true);
+                path = QPainterPath();
+
                 const QPointF principal_pt = QPointF(0,vp_a.y());
                 const qreal principal_pt_dst = ortho.y() - principal_pt.y();
 
@@ -300,6 +303,18 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 const QQuaternion pitch = QQuaternion::fromAxisAndAngle(QVector3D(1,0,0), pitch_angle * (vp_a.y() < 0 ? 1 : -1));
                 const QQuaternion yaw = QQuaternion::fromAxisAndAngle(QVector3D(0,1,0), -yaw_angle);
                 const QQuaternion orientation = pitch * yaw;
+
+                // fading effect for floor/ceiling gridlines to reduce visual noise
+                const QPointF fade_upper = principal_pt + QPointF(0, cov_size);
+                const QPointF fade_lower = principal_pt - QPointF(0, cov_size);
+                QColor color = effectiveAssistantColor();
+                QGradient fade = QLinearGradient(inv.map(fade_upper), inv.map(fade_lower));
+                color.setAlphaF(0);
+                fade.setColorAt(0.4, effectiveAssistantColor());
+                fade.setColorAt(0.5, color);
+                fade.setColorAt(0.6, effectiveAssistantColor());
+                const QPen old_pen = gc.pen();
+                gc.setPen(QPen(QBrush(fade), 1, old_pen.style()));
 
                 // draw floor+ceiling gridlines
                 const qreal height = dst;
@@ -328,6 +343,11 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                         }
                     }
                 }
+
+                gc.drawPath(path);
+
+                gc.setPen(old_pen);
+                path = QPainterPath();
 
                 // wall gridlines (vertical lines only)
                 const int wall_dst = 5;
