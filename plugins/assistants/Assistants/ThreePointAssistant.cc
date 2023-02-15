@@ -238,23 +238,16 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
         }
 
 
-        if (handles().size() == 3) {
+        if (handles().size() >= 3) {
             const QPointF p3 = *handles()[2];
 
             if (assistantVisible && isEditing) {
-                QLineF vanishingLineA = initialTransform.map(QLineF(p3,p1));
-                QLineF vanishingLineB = initialTransform.map(QLineF(p3,p2));
-                KisAlgebra2D::cropLineToConvexPolygon(vanishingLineA, viewportAndLocalPoly, true, true);
-                KisAlgebra2D::cropLineToConvexPolygon(vanishingLineB, viewportAndLocalPoly, true, true);
-            }
-
-            if (assistantVisible && !isEditing) {
                 drawX(gc, initialTransform.map(p1));
                 drawX(gc, initialTransform.map(p2));
                 drawX(gc, initialTransform.map(p3));
             }
 
-            if (isValid()) {
+            if (isValid() && assistantVisible) {
 
                 const QTransform t = localTransform(p1,p2,p3);
                 const QPointF vp_a = t.map(p1);
@@ -270,7 +263,7 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 const qreal theta = vp_a.y() - ortho.y();
                 const qreal cov_size = sqrt(sp_distance*sp_distance - theta*theta);
 
-                if (isEditing) {
+                if (assistantVisible && isEditing) {
                     drawX(gc, inv.map(ortho)); // center of vision
                     const qreal actual_size = inv.map(QLineF(ortho, QPointF(cov_size, ortho.y()))).length();
                     const QPointF cov_corner = QPointF(actual_size,actual_size);
@@ -282,15 +275,16 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 drawPath(gc, path, isSnappingActive(), true);
                 path = QPainterPath();
 
+                // orthocenter == image center
+                // orthocenter as origin makes calculations easier to reason withs
+                QTransform t_ortho = QTransform();
+                t_ortho.translate(-ortho.x(), -ortho.y());
+
                 const QPointF principal_pt = QPointF(0,vp_a.y());
                 const qreal principal_pt_dst = ortho.y() - principal_pt.y();
 
-                // adistance to image plane
+                // distance to image plane
                 const qreal dst = principal_pt_dst / qTan(qAsin(principal_pt_dst / sp_distance));
-
-                // orthocentr as origin makes calculations easier to write
-                QTransform t_ortho = QTransform();
-                t_ortho.translate(-ortho.x(), -ortho.y());
 
                 // orthonormal vectors projecting from center of projection to VPs on image plane
                 const QVector3D p1_vec = QVector3D(QVector2D(t_ortho.map(vp_a)),dst);
@@ -304,7 +298,7 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 const QQuaternion yaw = QQuaternion::fromAxisAndAngle(QVector3D(0,1,0), -yaw_angle);
                 const QQuaternion orientation = pitch * yaw;
 
-                // fading effect for floor/ceiling gridlines to reduce visual noise
+                // fading effect for floor/ceiling gridlines to reduce visual noise, centered around horizon
                 const QPointF fade_upper = principal_pt + QPointF(0, cov_size);
                 const QPointF fade_lower = principal_pt - QPointF(0, cov_size);
                 QColor color = effectiveAssistantColor();
@@ -319,26 +313,27 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 // draw floor+ceiling gridlines
                 const qreal height = dst;
                 const qreal base = dst;
-                const QVector3D translation = pitch.rotatedVector(QVector3D(0,0,0));
+                const QVector3D translation = pitch.rotatedVector(QVector3D(0,0,base));
                 const int grid_size = 50;
                 for (int i = -grid_size; i < grid_size; i++) {
                     for (QPointF vp : QList<QPointF>({p1,p2})) {
                         for (int side : QList<int>({1, -1})) {
                             const QVector3D pt = orientation.rotatedVector(QVector3D(i*base,side*height,i*base)) + translation;
                             const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
-                            bool diverge = ((t_ortho.inverted().map(projection).y() - t.map(vp).y()) < 0);
+                            const qreal horizon_y = t_ortho.map(t.map(vp)).y();
+
+                            // distinguish when projection pt gets projected to other side
+                            const bool opp_side = (((projection.y() - horizon_y) < 0) && side == 1) || ((projection.y() - horizon_y > 0) && side == -1);
                             const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
                             QLineF gridline = QLineF(initialTransform.map(vp), projection_d);
-                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, true, true);
-
+                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, opp_side, !opp_side);
+                            if (opp_side && !gridline.isNull()) {
+                                gridline.setP2(initialTransform.map(vp));
+                                KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, false);
+                            }
                             if (!gridline.isNull()) {
-                                if (diverge) {
-                                    path.moveTo(initialTransform.map(vp));
-                                    path.lineTo(side == 1 ? gridline.p1() : gridline.p2());
-                                } else {
-                                    path.moveTo(initialTransform.map(vp));
-                                    path.lineTo(side == 1 ? gridline.p2() : gridline.p1());
-                                }
+                                path.moveTo(gridline.p1());
+                                path.lineTo(gridline.p2());
                             }
                         }
                     }
@@ -349,46 +344,50 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 gc.setPen(old_pen);
                 path = QPainterPath();
 
+                // fading effect for vertical lines is radial and centers on the vanishing point
+                QColor color2 = effectiveAssistantColor();
+                color2.setAlphaF(0.5*color2.alphaF());
+                QGradient vfade = QRadialGradient(initialTransform.map(p3),
+                                                  inv.map(QLineF(ortho, QPointF(cov_size, ortho.y()))).length()); // cov size
+                vfade.setColorAt(0, color);
+                vfade.setColorAt(1, color2);
+                gc.setPen(QPen(QBrush(vfade), 1, gc.pen().style()));
+
                 // wall gridlines (vertical lines only)
-                const int wall_dst = 5;
-                for (int side : QList<int>({-1,1})) {
-                    const QVector3D pt_zx = orientation.rotatedVector(QVector3D(side*wall_dst*base,0,side*wall_dst*base)) + translation;
+                const int wall_dst = 10;
+                for (int corner : QList<int>({-1, 1})) { // near and far corner
+                    const QVector3D pt_zx = orientation.rotatedVector(QVector3D(corner*wall_dst*base,0,corner*wall_dst*base)) + translation;
                     const QPointF projection_zx = QPointF(pt_zx.x()/pt_zx.z()*dst, pt_zx.y()/pt_zx.z()*dst);
                     for (int i = -wall_dst; i <= wall_dst; i++) {
-                        const QVector3D pt_z = orientation.rotatedVector(QVector3D(side*wall_dst*base,0,i*base)) + translation;
-                        const QVector3D pt_x = orientation.rotatedVector(QVector3D(i*base,0,side*wall_dst*base)) + translation;
-                        const QPointF projection_z = QPointF(pt_z.x()/pt_z.z()*dst, pt_z.y()/pt_z.z()*dst);
-                        const QPointF projection_x = QPointF(pt_x.x()/pt_x.z()*dst, pt_x.y()/pt_x.z()*dst);
-                        const QPointF projection_z_d = inv.map(t_ortho.inverted().map(projection_z));
-                        const QPointF projection_x_d = inv.map(t_ortho.inverted().map(projection_x));
-                        QLineF gridline_z = QLineF(initialTransform.map(p3), projection_z_d);
-                        QLineF gridline_x = QLineF(initialTransform.map(p3), projection_x_d);
-                        KisAlgebra2D::cropLineToConvexPolygon(gridline_z, viewportAndLocalPoly, true, true);
-                        KisAlgebra2D::cropLineToConvexPolygon(gridline_x, viewportAndLocalPoly, true, true);
-                        if (!gridline_z.isNull()) {
-                            path.moveTo(initialTransform.map(p3));
-                            if (projection_z.x() >= projection_zx.x() || i == side*wall_dst) {
-                                const QPointF grid_p2 = side == 1 ? gridline_z.p2() : gridline_z.p1();
-                                path.lineTo(grid_p2);
-                            } else {
-                                const QPointF grid_p2 = side == 1 ? gridline_z.p1() : gridline_z.p2();
-                                path.lineTo(grid_p2);
+                        const QMap<int,QVector3D> projections = { // needed for handling edge case
+                            { 1, orientation.rotatedVector(QVector3D(corner*wall_dst*base,0,i*base)) + translation}, // z axis
+                            {-1, orientation.rotatedVector(QVector3D(i*base,0,corner*wall_dst*base)) + translation} // x axis
+                        };
+                        QMapIterator<int, QVector3D> imap(projections);
+                        while(imap.hasNext()) {
+                            imap.next();
+                            const int native_side = imap.key();
+                            const QVector3D pt = imap.value();
+                            const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
+                            const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
+                            QLineF gridline = QLineF(initialTransform.map(p3), projection_d);
+                            const bool far_diagonal = i == corner*wall_dst && corner == -1 && vp_a.x() < 0; // hack alert
+                            const bool opp_side = (corner == native_side ? projection.x() < projection_zx.x() : projection.x() > projection_zx.x()) || far_diagonal;
+                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, opp_side, !opp_side);
+                            if ((opp_side || far_diagonal)  && !gridline.isNull()) {
+                                gridline.setP2(initialTransform.map(p3));
+                                KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, false);
                             }
-                        }
-                        if (!gridline_x.isNull()) {
-                            path.moveTo(initialTransform.map(p3));
-                            if (projection_x.x() <= projection_zx.x() || i == side*wall_dst) {
-                                const QPointF grid_p2 = side == 1 ? gridline_x.p2() : gridline_x.p1();
-                                path.lineTo(grid_p2);
-                            } else {
-                                const QPointF grid_p2 = side == 1 ? gridline_x.p1() : gridline_x.p2();
-                                path.lineTo(grid_p2);
+                            if (!gridline.isNull()) {
+                                path.moveTo(gridline.p1());
+                                path.lineTo(gridline.p2());
                             }
                         }
                     }
                 }
-
-                drawPath(gc, path, isSnappingActive(), true);
+                gc.drawPath(path);
+                gc.setPen(old_pen);
+                path = QPainterPath();
             } else {
                 drawError(gc, path);
             }
