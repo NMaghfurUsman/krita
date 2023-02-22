@@ -301,24 +301,24 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 // fading effect for floor/ceiling gridlines to reduce visual noise, centered around horizon
                 const QPointF fade_upper = principal_pt + QPointF(0, cov_size);
                 const QPointF fade_lower = principal_pt - QPointF(0, cov_size);
-                QColor color = effectiveAssistantColor();
+                QColor color = QColor("Yellow");
                 QGradient fade = QLinearGradient(inv.map(fade_upper), inv.map(fade_lower));
                 color.setAlphaF(0);
-                fade.setColorAt(0.4, effectiveAssistantColor());
+                fade.setColorAt(0.4, QColor("Yellow"));
                 fade.setColorAt(0.5, color);
-                fade.setColorAt(0.6, effectiveAssistantColor());
+                fade.setColorAt(0.6, QColor("Yellow"));
                 const QPen old_pen = gc.pen();
                 gc.setPen(QPen(QBrush(fade), 1, old_pen.style()));
 
                 // draw floor+ceiling gridlines
-                const qreal height = dst;
+                const qreal height = 10;
                 const qreal base = dst;
                 const QVector3D translation = pitch.rotatedVector(QVector3D(0,0,base));
                 const int grid_size = 50;
                 for (int i = -grid_size; i < grid_size; i++) {
                     for (QPointF vp : QList<QPointF>({p1,p2})) {
                         for (int side : QList<int>({1, -1})) {
-                            const QVector3D pt = orientation.rotatedVector(QVector3D(i*base,side*height,i*base)) + translation;
+                            const QVector3D pt = orientation.rotatedVector(QVector3D(i*base,side*base*height,i*base)) + translation;
                             const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
                             const qreal horizon_y = t_ortho.map(t.map(vp)).y();
 
@@ -341,51 +341,70 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
 
                 gc.drawPath(path);
 
-                gc.setPen(old_pen);
-                path = QPainterPath();
+                const int wall_dst = height;
+                const QColor cols[] = {QColor("Pink"),QColor("Cyan")};
+                const QPointF vps[] = {p2, p1};
+                const std::array<QVector3D, 2> grid_template[] = {{QVector3D(1, 0, wall_dst), QVector3D( 1, 0,-wall_dst)},
+                                                                 {QVector3D(wall_dst, 0, 1), QVector3D( -wall_dst, 0,1)}};
 
-                // fading effect for vertical lines is radial and centers on the vanishing point
-                QColor color2 = effectiveAssistantColor();
-                color2.setAlphaF(0.5*color2.alphaF());
-                QGradient vfade = QRadialGradient(initialTransform.map(p3),
-                                                  inv.map(QLineF(ortho, QPointF(cov_size, ortho.y()))).length()); // cov size
-                vfade.setColorAt(0, color);
-                vfade.setColorAt(1, color2);
-                gc.setPen(QPen(QBrush(vfade), 1, gc.pen().style()));
+                for (int idx = 0; idx < 2 ; idx++) {
 
-                // wall gridlines (vertical lines only)
-                const int wall_dst = 10;
-                for (int corner : QList<int>({-1, 1})) { // near and far corner
-                    const QVector3D pt_zx = orientation.rotatedVector(QVector3D(corner*wall_dst*base,0,corner*wall_dst*base)) + translation;
-                    const QPointF projection_zx = QPointF(pt_zx.x()/pt_zx.z()*dst, pt_zx.y()/pt_zx.z()*dst);
-                    for (int i = -wall_dst; i <= wall_dst; i++) {
-                        const QMap<int,QVector3D> projections = { // needed for handling edge case
-                            { 1, orientation.rotatedVector(QVector3D(corner*wall_dst*base,0,i*base)) + translation}, // z axis
-                            {-1, orientation.rotatedVector(QVector3D(i*base,0,corner*wall_dst*base)) + translation} // x axis
-                        };
-                        QMapIterator<int, QVector3D> imap(projections);
-                        while(imap.hasNext()) {
-                            imap.next();
-                            const int native_side = imap.key();
-                            const QVector3D pt = imap.value();
+                    const QPointF vp = vps[idx];
+                    const QPointF vp_opp = vp == p1 ? p2 : p1;
+                    const std::array<QVector3D,2> pts = grid_template[idx];
+
+
+                    gc.setPen(old_pen);
+                    path = QPainterPath();
+
+                    const QTransform v_t = localTransform(vp,p3,vp_opp);
+                    const QPointF v_principal_pt = QPointF(0,v_t.map(vp).y());
+                    const QPointF v_fade_upper = v_principal_pt + QPointF(0, cov_size*2);
+                    const QPointF v_fade_lower = v_principal_pt - QPointF(0, cov_size*2);
+                    const QTransform v_inv = v_t.inverted() * initialTransform;
+
+                    QColor color2 = cols[idx];
+                    color2.setAlphaF(0.5*color2.alphaF());
+                    QGradient vfade = QLinearGradient(v_inv.map(v_fade_upper), v_inv.map(v_fade_lower));
+                    vfade.setColorAt(0.3, color2);
+                    vfade.setColorAt(0.7, color2);
+                    color2.setAlpha(0);
+                    vfade.setColorAt(0.5, color2);
+                    gc.setPen(QPen(QBrush(vfade), 1, gc.pen().style()));
+
+                    for (int i = -100; i < 100; i++) {
+                        for (QVector3D pt : pts) {
+                            if (pt.x() == 1) {pt.setX(i);}
+                            if (pt.z() == 1) {pt.setZ(i);}
+                            pt.setX(pt.x() * base);
+                            pt.setZ(pt.z() * base);
+                            pt = orientation.rotatedVector(pt) + translation;
+                            const bool behind_image = pt.z() < 0;
                             const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
                             const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
                             QLineF gridline = QLineF(initialTransform.map(p3), projection_d);
-                            const bool far_diagonal = i == corner*wall_dst && corner == -1 && vp_a.x() < 0; // hack alert
-                            const bool opp_side = (corner == native_side ? projection.x() < projection_zx.x() : projection.x() > projection_zx.x()) || far_diagonal;
-                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, opp_side, !opp_side);
-                            if ((opp_side || far_diagonal)  && !gridline.isNull()) {
+                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, behind_image, true);
+                            if (!gridline.isNull()) {
+                                gridline.setP1(behind_image ? gridline.p1() : gridline.p2());
                                 gridline.setP2(initialTransform.map(p3));
                                 KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, false);
-                            }
-                            if (!gridline.isNull()) {
                                 path.moveTo(gridline.p1());
                                 path.lineTo(gridline.p2());
                             }
                         }
+                        const QVector3D pt = orientation.rotatedVector(QVector3D(wall_dst*base,i*base,wall_dst*base)) + translation;
+                        const bool behind_image = pt.z() < 0;
+                        const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
+                        const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
+                        QLineF gridline = QLineF(initialTransform.map(vp), projection_d);
+                        KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, true);
+                        if (!gridline.isNull() && !behind_image) {
+                            path.moveTo(gridline.p1());
+                            path.lineTo(gridline.p2());
+                        }
                     }
+                    gc.drawPath(path);
                 }
-                gc.drawPath(path);
                 gc.setPen(old_pen);
                 path = QPainterPath();
             } else {
