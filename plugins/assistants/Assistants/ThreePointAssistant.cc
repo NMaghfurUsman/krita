@@ -276,7 +276,7 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 path = QPainterPath();
 
                 // orthocenter == image center
-                // orthocenter as origin makes calculations easier to reason withs
+                // orthocenter as origin makes calculations easier to reason with
                 QTransform t_ortho = QTransform();
                 t_ortho.translate(-ortho.x(), -ortho.y());
 
@@ -288,13 +288,14 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
 
                 // orthonormal vectors projecting from center of projection to VPs on image plane
                 const QVector3D p1_vec = QVector3D(QVector2D(t_ortho.map(vp_a)),dst);
-                const QVector3D p2_vec = QVector3D(QVector2D(t_ortho.map(vp_b)),dst);
                 const QVector3D p3_vec = QVector3D(QVector2D(t_ortho.map(QPointF(0,0))),dst);
 
                 // use the vanishing point vectors to recover the camera's orientation
                 const qreal pitch_angle = qRadiansToDegrees(qAsin(qAbs(p3_vec.z()/p3_vec.length())));
                 const qreal yaw_angle = qRadiansToDegrees(qAsin(qAbs(p1_vec.x()/p1_vec.length())));
-                const QQuaternion pitch = QQuaternion::fromAxisAndAngle(QVector3D(1,0,0), pitch_angle * (vp_a.y() < 0 ? 1 : -1));
+                const QQuaternion pitch = QQuaternion::fromAxisAndAngle(QVector3D(1,0,0),
+                                                                        // hack alert: not sure why it works like this
+                                                                        pitch_angle * (principal_pt.y() < 0 ? 1 : -1));
                 const QQuaternion yaw = QQuaternion::fromAxisAndAngle(QVector3D(0,1,0), -yaw_angle);
                 const QQuaternion orientation = pitch * yaw;
 
