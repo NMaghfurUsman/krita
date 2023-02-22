@@ -299,114 +299,60 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                 const QQuaternion yaw = QQuaternion::fromAxisAndAngle(QVector3D(0,1,0), -yaw_angle);
                 const QQuaternion orientation = pitch * yaw;
 
-                // fading effect for floor/ceiling gridlines to reduce visual noise, centered around horizon
-                const QPointF fade_upper = principal_pt + QPointF(0, cov_size);
-                const QPointF fade_lower = principal_pt - QPointF(0, cov_size);
-                QColor color = QColor("Yellow");
-                QGradient fade = QLinearGradient(inv.map(fade_upper), inv.map(fade_lower));
-                color.setAlphaF(0);
-                fade.setColorAt(0.4, QColor("Yellow"));
-                fade.setColorAt(0.5, color);
-                fade.setColorAt(0.6, QColor("Yellow"));
-                const QPen old_pen = gc.pen();
-                gc.setPen(QPen(QBrush(fade), 1, old_pen.style()));
+                // draw perspective grid as 3d cube room centered around viewer
+                const qreal unit_size = dst; // size of grid square
+                const int plane_dst = 5; // distance from center of room to walls in unit size
+                const QVector3D offset = pitch.rotatedVector(QVector3D(0,0,unit_size)); // offset from center of rotation
+                const int wall_size = plane_dst; // wall size as units from center (so double this for actual size)
 
-                // draw floor+ceiling gridlines
-                const qreal height = 10;
-                const qreal base = dst;
-                const QVector3D translation = pitch.rotatedVector(QVector3D(0,0,base));
-                const int grid_size = 50;
-                for (int i = -grid_size; i < grid_size; i++) {
-                    for (QPointF vp : QList<QPointF>({p1,p2})) {
-                        for (int side : QList<int>({1, -1})) {
-                            const QVector3D pt = orientation.rotatedVector(QVector3D(i*base,side*base*height,i*base)) + translation;
-                            const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
-                            const qreal horizon_y = t_ortho.map(t.map(vp)).y();
+                for (int i = -wall_size; i <= wall_size; i++) {
 
-                            // distinguish when projection pt gets projected to other side
-                            const bool opp_side = (((projection.y() - horizon_y) < 0) && side == 1) || ((projection.y() - horizon_y > 0) && side == -1);
-                            const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
-                            QLineF gridline = QLineF(initialTransform.map(vp), projection_d);
-                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, opp_side, !opp_side);
-                            if (opp_side && !gridline.isNull()) {
-                                gridline.setP2(initialTransform.map(vp));
-                                KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, false);
-                            }
-                            if (!gridline.isNull()) {
-                                path.moveTo(gridline.p1());
-                                path.lineTo(gridline.p2());
+                    for (int corner : {1,-1}) { // repeat for near and far corner of cube
+                        // 6 edges = 1 half-cube corner
+                        const std::array<QVector3D,2> edges[] = {
+                            {QVector3D( corner*plane_dst , wall_size        , i                ),
+                             QVector3D( corner*plane_dst ,-wall_size        , i                )},
+                            {QVector3D( corner*plane_dst , i                , wall_size        ),
+                             QVector3D( corner*plane_dst , i                ,-wall_size        )},
+                            {QVector3D( wall_size        , i                , corner*plane_dst ),
+                             QVector3D(-wall_size        , i                , corner*plane_dst )},
+                            {QVector3D( i                , wall_size        , corner*plane_dst ),
+                             QVector3D( i                ,-wall_size        , corner*plane_dst )},
+                            {QVector3D( wall_size        , corner*plane_dst , i                ),
+                             QVector3D(-wall_size        , corner*plane_dst , i                )},
+                            {QVector3D( i                , corner*plane_dst , wall_size        ),
+                             QVector3D( i                , corner*plane_dst ,-wall_size        )}
+                        };
+
+                        for (std::array<QVector3D,2> edge : edges) {
+                            const QVector3D pt_far  = orientation.rotatedVector(edge[0] * unit_size) + offset;
+                            const QVector3D pt_near = orientation.rotatedVector(edge[1] * unit_size) + offset;
+                            if (pt_far.z() > 0 || pt_near.z() > 0) { // don't draw line if it's behind image plane
+                                const QPointF projection_far  = QPointF(pt_far.x()/pt_far.z()*dst, pt_far.y()/pt_far.z()*dst);
+                                const QPointF projection_near = QPointF(pt_near.x()/pt_near.z()*dst, pt_near.y()/pt_near.z()*dst);
+                                const QPointF projection_far_mapped  = inv.map(t_ortho.inverted().map(projection_far));
+                                const QPointF projection_near_mapped = inv.map(t_ortho.inverted().map(projection_near));
+                                QLineF grid_line = QLineF(projection_near_mapped, projection_far_mapped);
+                                KisAlgebra2D::cropLineToConvexPolygon(grid_line, viewportAndLocalPoly,
+                                                                      // extend line in opposite direction if pt is behind image plane
+                                                                      pt_far.z() < 0, pt_near.z() < 0);
+                                if (!grid_line.isNull()) {
+                                    // draw in opposite direction if one of the points is behind the image plane
+                                    if (pt_far.z() < 0 || pt_near.z() < 0) {
+                                        if (pt_near.z() < 0) {grid_line.setP1(projection_far_mapped);}
+                                        if (pt_far.z() < 0) {grid_line.setP2(projection_near_mapped);}
+                                        KisAlgebra2D::cropLineToConvexPolygon(grid_line, viewportAndLocalPoly, false, false);
+                                    }
+
+                                    path.moveTo(grid_line.p1());
+                                    path.lineTo(grid_line.p2());
+                                }
                             }
                         }
                     }
                 }
 
-                gc.drawPath(path);
-
-                const int wall_dst = height;
-                const QColor cols[] = {QColor("Pink"),QColor("Cyan")};
-                const QPointF vps[] = {p2, p1};
-                const std::array<QVector3D, 2> grid_template[] = {{QVector3D(1, 0, wall_dst), QVector3D( 1, 0,-wall_dst)},
-                                                                 {QVector3D(wall_dst, 0, 1), QVector3D( -wall_dst, 0,1)}};
-
-                for (int idx = 0; idx < 2 ; idx++) {
-
-                    const QPointF vp = vps[idx];
-                    const QPointF vp_opp = vp == p1 ? p2 : p1;
-                    const std::array<QVector3D,2> pts = grid_template[idx];
-
-
-                    gc.setPen(old_pen);
-                    path = QPainterPath();
-
-                    const QTransform v_t = localTransform(vp,p3,vp_opp);
-                    const QPointF v_principal_pt = QPointF(0,v_t.map(vp).y());
-                    const QPointF v_fade_upper = v_principal_pt + QPointF(0, cov_size*2);
-                    const QPointF v_fade_lower = v_principal_pt - QPointF(0, cov_size*2);
-                    const QTransform v_inv = v_t.inverted() * initialTransform;
-
-                    QColor color2 = cols[idx];
-                    color2.setAlphaF(0.5*color2.alphaF());
-                    QGradient vfade = QLinearGradient(v_inv.map(v_fade_upper), v_inv.map(v_fade_lower));
-                    vfade.setColorAt(0.3, color2);
-                    vfade.setColorAt(0.7, color2);
-                    color2.setAlpha(0);
-                    vfade.setColorAt(0.5, color2);
-                    gc.setPen(QPen(QBrush(vfade), 1, gc.pen().style()));
-
-                    for (int i = -100; i < 100; i++) {
-                        for (QVector3D pt : pts) {
-                            if (pt.x() == 1) {pt.setX(i);}
-                            if (pt.z() == 1) {pt.setZ(i);}
-                            pt.setX(pt.x() * base);
-                            pt.setZ(pt.z() * base);
-                            pt = orientation.rotatedVector(pt) + translation;
-                            const bool behind_image = pt.z() < 0;
-                            const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
-                            const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
-                            QLineF gridline = QLineF(initialTransform.map(p3), projection_d);
-                            KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, behind_image, true);
-                            if (!gridline.isNull()) {
-                                gridline.setP1(behind_image ? gridline.p1() : gridline.p2());
-                                gridline.setP2(initialTransform.map(p3));
-                                KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, false);
-                                path.moveTo(gridline.p1());
-                                path.lineTo(gridline.p2());
-                            }
-                        }
-                        const QVector3D pt = orientation.rotatedVector(QVector3D(wall_dst*base,i*base,wall_dst*base)) + translation;
-                        const bool behind_image = pt.z() < 0;
-                        const QPointF projection = QPointF(pt.x()/pt.z()*dst, pt.y()/pt.z()*dst);
-                        const QPointF projection_d = inv.map(t_ortho.inverted().map(projection));
-                        QLineF gridline = QLineF(initialTransform.map(vp), projection_d);
-                        KisAlgebra2D::cropLineToConvexPolygon(gridline, viewportAndLocalPoly, false, true);
-                        if (!gridline.isNull() && !behind_image) {
-                            path.moveTo(gridline.p1());
-                            path.lineTo(gridline.p2());
-                        }
-                    }
-                    gc.drawPath(path);
-                }
-                gc.setPen(old_pen);
+                drawPath(gc, path, isSnappingActive(), true);
                 path = QPainterPath();
             } else {
                 drawError(gc, path);
