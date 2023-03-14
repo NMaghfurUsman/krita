@@ -133,16 +133,6 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
     }
 
     if (handles().size() >= 2) {
-        const QRect viewport= gc.viewport();
-
-        const QPolygonF localPoly = (isLocal() && handles().size() == 5) ? initialTransform.map(QPolygonF(getLocalRect())) : QPolygonF();
-        const QPolygonF viewportAndLocalPoly = !localPoly.isEmpty() ? QPolygonF(QRectF(viewport)).intersected(localPoly) : QRectF(viewport);
-
-        QPainterPath path;
-        QPainterPath previewPath; // part of the preview, instead of the assistant itself
-    }
-
-    if (handles().size() >= 2) {
         const QPointF p1 = *handles()[0];
         const QPointF p2 = *handles()[1];
         const QRect viewport= gc.viewport();
@@ -190,15 +180,11 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
             path.lineTo(initialTransform.map(p4));
             path.lineTo(initialTransform.map(p1));
         }
-
-        // copied from TwoPointassistant
         // draw temp vanishing point lines
-        if (handles().size() <= 3) {
-            QPainterPath path;
-            int tempDensity = m_gridDensity * 10; // the vanishing point density seems visibly more dense, hence let's make it less dense
-            QRect viewport = gc.viewport();
-
-            for (int i = 0; i < handles().size(); i++) {
+        if (!isValid()) {
+            QPainterPath tempPath;
+            int tempDensity = m_gridDensity * 20; // the vanishing point density seems visibly more dense, hence let's make it less dense
+            for (int i = 0; i < handles().size() && i < 3; i++) { // only draw on first 3 handles
                 const QPointF p = initialTransform.map(*handles()[i]);
                 for (int currentAngle=0; currentAngle <= 180; currentAngle = currentAngle + tempDensity) {
 
@@ -209,31 +195,14 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                     QPointF unit = QPointF(length*xPos, length*yPos);
 
                     // find point
-                    QLineF snapLine = QLineF(p, p + unit);
-                    if (KisAlgebra2D::intersectLineRect(snapLine, viewport, false)) {
+                    QLineF vpLine = QLineF(p - unit, p + unit);
+                    if (KisAlgebra2D::intersectLineRect(vpLine, viewport, false)) {
                         // make a line from VP center to edge of canvas with that angle
-
-                        path.moveTo(snapLine.p1());
-                        path.lineTo(snapLine.p2());
+                        tempPath.moveTo(vpLine.p1());
+                        tempPath.lineTo(vpLine.p2());
                     }
-
-                    QLineF snapLine2 = QLineF(p, p - unit);
-                    if (KisAlgebra2D::intersectLineRect(snapLine2, viewport, false)) {
-                        // make a line from VP center to edge of canvas with that angle
-
-                        path.moveTo(snapLine2.p1());
-                        path.lineTo(snapLine2.p2());
-                    }
-
-
                 }
-                if (handles().size() >= 3) {
-                    if (!isValid()) {
-                        drawPreview(gc, path);//and we draw the preview.
-                    }
-                } else {
-                        drawPreview(gc, path);//and we draw the preview.
-                }
+                drawPath(gc, tempPath, true, true);
             }
         }
 
@@ -357,6 +326,8 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
             } else {
                 drawError(gc, path);
             }
+        } else {
+            drawPreview(gc, path);
         }
     }
 
@@ -375,22 +346,26 @@ QTransform ThreePointAssistant::localTransform(QPointF vp_a, QPointF vp_b, QPoin
 
 bool ThreePointAssistant::isValid()
 {
-    const QTransform t = localTransform(*handles()[0],*handles()[1],*handles()[2]);
-    const QPointF vp_a = t.map(*handles()[0]);
-    const QPointF vp_b = t.map(*handles()[1]);
+    if (handles().size() < 3) {
+        return false;
+    } else {
+        const QTransform t = localTransform(*handles()[0],*handles()[1],*handles()[2]);
+        const QPointF vp_a = t.map(*handles()[0]);
+        const QPointF vp_b = t.map(*handles()[1]);
 
-    bool vpMode = true;
+        bool vpMode = true;
 
-    // is vertical vanishing point between the left and right vanishing points?
-    bool isBetween = (vp_a.x() < 0 && vp_b.x() > 0) || (vp_a.x() > 0 && vp_b.x() < 0);
+        // is vertical vanishing point between the left and right vanishing points?
+        bool isBetween = (vp_a.x() < 0 && vp_b.x() > 0) || (vp_a.x() > 0 && vp_b.x() < 0);
 
-    // do the 3 handles form an acute triangle?
-    QPointF vp_c = vpMode ? QPointF(0,0) : orthocenter(vp_a, vp_b, QPointF(0,0));
-    QLineF a = QLineF(vp_c, vp_a);
-    QLineF b = QLineF(vp_c, vp_b);
-    bool isAcute = qCos(qDegreesToRadians(a.angleTo(b))) > 0;
+        // do the 3 handles form an acute triangle?
+        QPointF vp_c = vpMode ? QPointF(0,0) : orthocenter(vp_a, vp_b, QPointF(0,0));
+        QLineF a = QLineF(vp_c, vp_a);
+        QLineF b = QLineF(vp_c, vp_b);
+        bool isAcute = qCos(qDegreesToRadians(a.angleTo(b))) > 0;
 
-    return isAcute && isBetween;
+        return isAcute && isBetween;
+    }
 }
 
 void ThreePointAssistant::drawCache(QPainter& gc, const KisCoordinatesConverter *converter, bool assistantVisible)
