@@ -202,7 +202,11 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
                         tempPath.lineTo(vpLine.p2());
                     }
                 }
+            }
+            if (handles().size() <= 2) {
                 drawPath(gc, tempPath, true, true);
+            } else {
+                drawError(gc, tempPath);
             }
         }
 
