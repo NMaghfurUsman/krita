@@ -66,6 +66,26 @@
     </widget>
    </item>
    <item>
+    <widget class="KisDoubleSliderSpinBox" name="threePointDensitySpinbox" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>50</width>
+       <height>20</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="KisSliderSpinBox" name="threePointDistanceSpinbox" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>50</width>
+       <height>20</height>
+      </size>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="KisDoubleSliderSpinBox" name="vanishingPointAngleSpinbox" native="true">
      <property name="minimumSize">
       <size>

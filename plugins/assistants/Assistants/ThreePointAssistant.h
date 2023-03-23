@@ -41,6 +41,11 @@ public:
     bool isAssistantComplete() const override;
     bool canBeLocal() const override;
 
+    double gridDensity();
+    void setGridDensity(double density);
+    int wallDistance();
+    void setWallDistance(int distance);
+
     void realignSideHandles(KisPaintingAssistantHandleSP dragged_handle) override;
     void realignVanishingPoint(KisPaintingAssistantHandleSP dragged_handle, KoPointerEvent* event, QPointF* drag_start, QPointF* adjustment) override;
     void initSideHandles() override;
@@ -65,6 +70,7 @@ private:
 
     QLineF m_snapLine;
     double m_gridDensity {1.0};
+    int m_wallDistance {10};
     bool m_useVertical {true};
 
     int m_lastUsedPoint {-1}; // last used vanishing point

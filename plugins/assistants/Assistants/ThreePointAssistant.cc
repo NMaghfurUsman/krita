@@ -274,7 +274,7 @@ void ThreePointAssistant::drawAssistant(QPainter& gc, const QRectF& updateRect, 
 
                 // draw perspective grid as 3d cube room centered around viewer
                 const qreal unit_size = dst; // size of grid square
-                const int plane_dst = 5; // distance from center of room to walls in unit size
+                const int plane_dst = m_wallDistance; // distance from center of room to walls in unit size
                 const QVector3D offset = pitch.rotatedVector(QVector3D(0,0,unit_size)); // offset from center of rotation
                 const int wall_size = plane_dst; // wall size as units from center (so double this for actual size)
 
@@ -402,6 +402,26 @@ KisPaintingAssistantHandleSP ThreePointAssistant::secondLocalHandle() const
     } else {
         return nullptr;
     }
+}
+
+void ThreePointAssistant::setGridDensity(double density)
+{
+    m_gridDensity = density;
+}
+
+double ThreePointAssistant::gridDensity()
+{
+    return m_gridDensity;
+}
+
+void ThreePointAssistant::setWallDistance(int distance)
+{
+    m_wallDistance = distance;
+}
+
+int ThreePointAssistant::wallDistance()
+{
+    return m_wallDistance;
 }
 
 QPointF ThreePointAssistant::getDefaultEditorPosition() const

@@ -97,6 +97,8 @@ public Q_SLOTS:
     void slotChangeVanishingPointAngle(double value);
     void slotChangeTwoPointDensity(double value);
     void slotChangeTwoPointUseVertical(int value);
+    void slotChangeThreePointDensity(double value);
+    void slotChangeThreePointDistance(int value);
     void slotChangeSubdivisions(int value);
     void slotChangeMinorSubdivisions(int value);
     void slotEnableFixedLength(int enabled);

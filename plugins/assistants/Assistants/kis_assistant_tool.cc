@@ -42,6 +42,7 @@
 #include "EditAssistantsCommand.h"
 #include "PerspectiveAssistant.h"
 #include "RulerAssistant.h"
+#include "ThreePointAssistant.h"
 #include "TwoPointAssistant.h"
 #include "VanishingPointAssistant.h"
 
@@ -625,6 +626,7 @@ void KisAssistantTool::updateToolOptionsUI()
      if (m_selectedAssistant) {
          bool isVanishingPointAssistant = m_selectedAssistant->id() == "vanishing point";
          bool isTwoPointAssistant = m_selectedAssistant->id() == "two point";
+         bool isThreePointAssistant = m_selectedAssistant->id() == "three point";
          bool isRulerAssistant = m_selectedAssistant->id() == "ruler"
                               || m_selectedAssistant->id() == "infinite ruler";
          bool isPerspectiveAssistant = m_selectedAssistant->id() == "perspective";
@@ -632,6 +634,8 @@ void KisAssistantTool::updateToolOptionsUI()
          m_options.vanishingPointAngleSpinbox->setVisible(isVanishingPointAssistant);
          m_options.twoPointDensitySpinbox->setVisible(isTwoPointAssistant);
          m_options.twoPointUseVerticalCheckbox->setVisible(isTwoPointAssistant);
+         m_options.threePointDensitySpinbox->setVisible(isThreePointAssistant);
+         m_options.threePointDistanceSpinbox->setVisible(isThreePointAssistant);
          m_options.subdivisionsSpinbox->setVisible(isRulerAssistant || isPerspectiveAssistant);
          m_options.minorSubdivisionsSpinbox->setVisible(isRulerAssistant);
          m_options.fixedLengthCheckbox->setVisible(isRulerAssistant);
@@ -645,6 +649,12 @@ void KisAssistantTool::updateToolOptionsUI()
              QSharedPointer <TwoPointAssistant> assis = qSharedPointerCast<TwoPointAssistant>(m_selectedAssistant);
              m_options.twoPointDensitySpinbox->setValue(assis->gridDensity());
              m_options.twoPointUseVerticalCheckbox->setChecked(assis->useVertical());
+         }
+
+         if (isThreePointAssistant) {
+             QSharedPointer <ThreePointAssistant> assis = qSharedPointerCast<ThreePointAssistant>(m_selectedAssistant);
+             m_options.threePointDensitySpinbox->setValue(assis->gridDensity());
+             m_options.threePointDistanceSpinbox->setValue(assis->wallDistance());
          }
 
          if (isRulerAssistant) {
@@ -689,6 +699,8 @@ void KisAssistantTool::updateToolOptionsUI()
          m_options.vanishingPointAngleSpinbox->setVisible(false);
          m_options.twoPointDensitySpinbox->setVisible(false);
          m_options.twoPointUseVerticalCheckbox->setVisible(false);
+         m_options.threePointDensitySpinbox->setVisible(false);
+         m_options.threePointDistanceSpinbox->setVisible(false);
          m_options.subdivisionsSpinbox->setVisible(false);
          m_options.minorSubdivisionsSpinbox->setVisible(false);
          m_options.fixedLengthCheckbox->setVisible(false);
@@ -751,6 +763,46 @@ void KisAssistantTool::slotChangeTwoPointDensity(double value)
         if (isTwoPointAssistant) {
             QSharedPointer <TwoPointAssistant> assis = qSharedPointerCast<TwoPointAssistant>(m_selectedAssistant);
             assis->setGridDensity((float)value);
+        }
+    }
+
+    m_canvas->updateCanvasDecorations();
+}
+
+void KisAssistantTool::slotChangeThreePointDensity(double value)
+{
+    if ( m_canvas->paintingAssistantsDecoration()->assistants().length() == 0) {
+        return;
+    }
+
+    // get the selected assistant and change the angle value
+    KisPaintingAssistantSP m_selectedAssistant =  m_canvas->paintingAssistantsDecoration()->selectedAssistant();
+    if (m_selectedAssistant) {
+        bool isThreePointAssistant = m_selectedAssistant->id() == "three point";
+
+        if (isThreePointAssistant) {
+            QSharedPointer <ThreePointAssistant> assis = qSharedPointerCast<ThreePointAssistant>(m_selectedAssistant);
+            assis->setGridDensity((float)value);
+        }
+    }
+
+    m_canvas->updateCanvasDecorations();
+}
+
+void KisAssistantTool::slotChangeThreePointDistance(int value)
+{
+    if ( m_canvas->paintingAssistantsDecoration()->assistants().length() == 0) {
+        return;
+    }
+
+    KisPaintingAssistantSP m_selectedAssistant =  m_canvas->paintingAssistantsDecoration()->selectedAssistant();
+    if (m_selectedAssistant) {
+        bool isThreePointAssistant = m_selectedAssistant->id() == "three point";
+
+        if (isThreePointAssistant) {
+            qDebug() << "wall distance: " << ppVar(value);
+            QSharedPointer <ThreePointAssistant> assis = qSharedPointerCast<ThreePointAssistant>(m_selectedAssistant);
+            assis->setWallDistance((int)value);
         }
     }
 
@@ -1355,6 +1407,8 @@ QWidget *KisAssistantTool::createOptionWidget()
         connect(m_options.vanishingPointAngleSpinbox, SIGNAL(valueChanged(double)), this, SLOT(slotChangeVanishingPointAngle(double)));
         connect(m_options.twoPointDensitySpinbox, SIGNAL(valueChanged(double)), this, SLOT(slotChangeTwoPointDensity(double)));
         connect(m_options.twoPointUseVerticalCheckbox, SIGNAL(stateChanged(int)), this, SLOT(slotChangeTwoPointUseVertical(int)));
+        connect(m_options.threePointDensitySpinbox, SIGNAL(valueChanged(double)), this, SLOT(slotChangeThreePointDensity(double)));
+        connect(m_options.threePointDistanceSpinbox, SIGNAL(valueChanged(int)), this, SLOT(slotChangeThreePointDistance(int)));
         
         connect(m_options.subdivisionsSpinbox, SIGNAL(valueChanged(int)), this, SLOT(slotChangeSubdivisions(int)));
         connect(m_options.minorSubdivisionsSpinbox, SIGNAL(valueChanged(int)), this, SLOT(slotChangeMinorSubdivisions(int)));
@@ -1394,6 +1448,14 @@ QWidget *KisAssistantTool::createOptionWidget()
         m_options.twoPointDensitySpinbox->setRange(0.1, 4.0, 2);
         m_options.twoPointDensitySpinbox->setSingleStep(0.1);
 
+        m_options.threePointDensitySpinbox->setPrefix(i18n("Horizontal Grid Density: "));
+        m_options.threePointDensitySpinbox->setRange(0.1, 4.0, 2);
+        m_options.threePointDensitySpinbox->setSingleStep(0.1);
+
+        m_options.threePointDistanceSpinbox->setPrefix(i18n("Vertical Plane Distance: "));
+        m_options.threePointDistanceSpinbox->setRange(1, 100, 2);
+        m_options.threePointDistanceSpinbox->setSingleStep(5);
+
         m_options.vanishingPointAngleSpinbox->setPrefix(i18n("Density: "));
         m_options.vanishingPointAngleSpinbox->setSuffix(QChar(Qt::Key_degree));
         m_options.vanishingPointAngleSpinbox->setRange(1.0, 180.0);
@@ -1418,6 +1480,7 @@ QWidget *KisAssistantTool::createOptionWidget()
         
         m_options.vanishingPointAngleSpinbox->setVisible(false);
         m_options.twoPointDensitySpinbox->setVisible(false);
+        m_options.threePointDensitySpinbox->setVisible(false);
         m_options.subdivisionsSpinbox->setVisible(false);
         m_options.minorSubdivisionsSpinbox->setVisible(false);
         m_options.fixedLengthCheckbox->setVisible(false);
